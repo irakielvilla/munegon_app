@@ -8,6 +8,8 @@ export interface Props {
   title?: string;
 }
 
+import '../styles/global.css';
+
 const { title = 'Muñegon POS' } = Astro.props;
 ---
 
@@ -24,8 +26,7 @@ const { title = 'Muñegon POS' } = Astro.props;
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png" />
 
-    <!-- Sistema de diseño global -->
-    <link rel="stylesheet" href="/src/styles/global.css" />
+    <!-- El CSS global se importa en el frontmatter para que Vite lo procese -->
   </head>
 
   <body>
