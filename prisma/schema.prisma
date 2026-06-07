@@ -1,0 +1,151 @@
+// ══════════════════════════════════════════════════════════════
+// MUÑEGON POS — Prisma Schema
+// Driver: libsql (SQLite local en dev/prod)
+// Sync target: Supabase PostgreSQL (gestionado aparte en el worker)
+// ══════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Provider declarativo. La URL y el adapter se configuran
+  // en prisma.config.ts (Prisma 7+ — nuevo formato).
+  provider = "sqlite"
+}
+
+// ──────────────────────────────────────────────────────────────
+// USUARIOS Y ROLES
+// ──────────────────────────────────────────────────────────────
+
+model Usuario {
+  id       String   @id @default(uuid())
+  nombre   String
+  pin      String // PIN hasheado con bcrypt — nunca en texto plano
+  rol      Rol
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now())
+
+  ventas  Venta[]
+  logs    LogCambio[]
+  cortes  CorteCaja[]
+}
+
+enum Rol {
+  ADMIN // Acceso total: Caja + Inventario + Reportes + Configuración
+  CAJERO // Solo Módulo de Caja
+}
+
+// ──────────────────────────────────────────────────────────────
+// INVENTARIO
+// ──────────────────────────────────────────────────────────────
+
+model Producto {
+  id            String   @id @default(uuid())
+  sku           String   @unique
+  nombre        String
+  descripcion   String?
+  precioUSD     String // Guardado como String para precisión Decimal exacta
+  stock         Int      @default(0)
+  stockMinimo   Int      @default(5) // Alerta de stock bajo
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+  isSynced      Boolean  @default(false) // Flag Offline-First: false = pendiente de subir
+
+  lineasVenta LineaVenta[]
+}
+
+// ──────────────────────────────────────────────────────────────
+// VENTAS / POS
+// ──────────────────────────────────────────────────────────────
+
+model Venta {
+  id             String     @id @default(uuid()) // UUID global irrepetible
+  usuarioId      String
+  usuario        Usuario    @relation(fields: [usuarioId], references: [id])
+  corteCajaId    String?    // Null hasta que se cierra el corte de caja
+  corteCaja      CorteCaja? @relation(fields: [corteCajaId], references: [id])
+  subtotal       String // String para precisión decimal exacta
+  impuesto       String
+  total          String
+  formaPago      FormaPago
+  moneda         Moneda
+  referenciaPago String? // Obligatoria si formaPago = BS_PAGO_MOVIL
+  tasaCambio     String? // Snapshot de la tasa BsD al momento de la venta
+  creadoEn       DateTime   @default(now())
+  isSynced       Boolean    @default(false)
+
+  lineas LineaVenta[]
+}
+
+model LineaVenta {
+  id         String   @id @default(uuid())
+  ventaId    String
+  venta      Venta    @relation(fields: [ventaId], references: [id])
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
+  cantidad   Int
+  precioUnit String // Snapshot del precio al momento de la venta
+  subtotal   String
+}
+
+enum FormaPago {
+  USD_EFECTIVO
+  BS_EFECTIVO
+  BS_DEBITO
+  BS_PAGO_MOVIL
+}
+
+enum Moneda {
+  USD
+  BS
+}
+
+// ──────────────────────────────────────────────────────────────
+// CORTES DE CAJA
+// ──────────────────────────────────────────────────────────────
+// tipo: "X" = Corte de turno (Cajero) | "Z" = Cierre de día (Admin)
+
+model CorteCaja {
+  id              String    @id @default(uuid())
+  tipo            String    // "X" o "Z" — validado en la aplicación
+  usuarioId       String
+  usuario         Usuario   @relation(fields: [usuarioId], references: [id])
+  totalCalculado  String    // Lo que el sistema registra (precisión String)
+  totalDeclarado  String    // Lo que el cajero cuenta físicamente
+  diferencia      String    // Faltante (negativo) o Sobrante (positivo)
+  ventasIncluidas Venta[]   // Ventas cerradas en este corte
+  creadoEn        DateTime  @default(now())
+  isSynced        Boolean   @default(false)
+}
+
+// ──────────────────────────────────────────────────────────────
+// CONFIGURACIÓN DEL SISTEMA
+// ──────────────────────────────────────────────────────────────
+// Pares clave-valor configurables desde la UI (ADMIN y CAJERO).
+// Claves definidas: tasa_cambio_bsd | iva_porcentaje | nombre_negocio
+
+model Configuracion {
+  clave       String   @id
+  valor       String
+  descripcion String?
+  updatedAt   DateTime @updatedAt
+}
+
+// ──────────────────────────────────────────────────────────────
+// LOG DE AUDITORÍA
+// ──────────────────────────────────────────────────────────────
+
+model LogCambio {
+  id           String   @id @default(uuid())
+  entidad      String // "Producto" | "Venta" | "Configuracion"
+  entidadId    String
+  campo        String
+  valorAntes   String?
+  valorDespues String?
+  usuarioId    String
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
+  creadoEn     DateTime @default(now())
+  isSynced     Boolean  @default(false)
+}

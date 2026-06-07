@@ -1,0 +1,737 @@
+---
+// ══════════════════════════════════════════════════════════════
+// MUÑEGON POS — Componente de Arranque: LoginScreen
+//
+// Pantalla de selección de usuario + ingreso de PIN.
+// Flujo:
+//   1. El usuario selecciona su perfil de la lista.
+//   2. Aparece el teclado numérico PIN con animación.
+//   3. Al confirmar PIN correcto → redirección según rol.
+//      - ADMIN  → /dashboard
+//      - CAJERO → /caja
+// ══════════════════════════════════════════════════════════════
+---
+
+<section class="login-screen" id="login-screen" aria-label="Pantalla de acceso">
+  <!-- ── Contenedor central ────────────────────────────────── -->
+  <div class="login-container animate-fade-in">
+    <!-- Logo y encabezado -->
+    <header class="login-header">
+      <div class="titulo">
+        <h1 class="login-title">Muñegon POS</h1>
+        <p class="login-subtitle">Selecciona tu perfil para continuar</p>
+      </div>
+    </header>
+
+    <!-- Panel principal: usuarios | PIN -->
+    <div class="login-panel" id="login-panel">
+      <!-- ── VISTA 1: Selección de Usuario ─────────────────── -->
+      <div
+        class="view-users"
+        id="view-users"
+        role="list"
+        aria-label="Perfiles de usuario"
+      >
+        <!-- Las tarjetas se generan dinámicamente por JS -->
+        <!-- Ejemplo visual de estructura (JS las reemplaza): -->
+        <div class="user-card skeleton" aria-hidden="true"></div>
+      </div>
+
+      <!-- ── VISTA 2: Teclado PIN ───────────────────────────── -->
+      <div class="view-pin hidden" id="view-pin" aria-label="Ingreso de PIN">
+        <!-- Usuario seleccionado -->
+        <div class="selected-user" id="selected-user-display">
+          <div class="selected-avatar" id="selected-avatar" aria-hidden="true">
+          </div>
+          <div>
+            <p class="selected-name" id="selected-name">—</p>
+            <span class="badge" id="selected-badge">—</span>
+          </div>
+          <button
+            class="btn-back"
+            id="btn-back"
+            aria-label="Volver a selección de usuario"
+            title="Cambiar usuario"
+          >
+            ← Cambiar
+          </button>
+        </div>
+
+        <!-- Indicador de puntos PIN -->
+        <div
+          class="pin-dots"
+          id="pin-dots"
+          role="status"
+          aria-label="Dígitos ingresados"
+        >
+          <span class="dot" id="dot-0"></span>
+          <span class="dot" id="dot-1"></span>
+          <span class="dot" id="dot-2"></span>
+          <span class="dot" id="dot-3"></span>
+          <span class="dot" id="dot-4"></span>
+          <span class="dot" id="dot-5"></span>
+        </div>
+
+        <!-- Mensaje de error -->
+        <p class="pin-error hidden" id="pin-error" role="alert">
+          PIN incorrecto. Intenta de nuevo.
+        </p>
+
+        <!-- Teclado numérico -->
+        <div
+          class="numpad"
+          id="numpad"
+          role="group"
+          aria-label="Teclado numérico"
+        >
+          <button class="num-key" data-value="1" id="key-1">1</button>
+          <button class="num-key" data-value="2" id="key-2">2</button>
+          <button class="num-key" data-value="3" id="key-3">3</button>
+          <button class="num-key" data-value="4" id="key-4">4</button>
+          <button class="num-key" data-value="5" id="key-5">5</button>
+          <button class="num-key" data-value="6" id="key-6">6</button>
+          <button class="num-key" data-value="7" id="key-7">7</button>
+          <button class="num-key" data-value="8" id="key-8">8</button>
+          <button class="num-key" data-value="9" id="key-9">9</button>
+          <button
+            class="num-key num-key--wide"
+            id="key-clear"
+            aria-label="Borrar dígito">⌫</button
+          >
+          <button class="num-key" data-value="0" id="key-0">0</button>
+          <button
+            class="num-key num-key--confirm btn-primary"
+            id="key-confirm"
+            aria-label="Confirmar PIN">✓</button
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Pie de pantalla -->
+    <footer class="login-footer">
+      <div class="fondopie">
+        <p>
+          v0.1.0 &nbsp;·&nbsp; <span id="sync-status" class="sync-indicator"
+            >⚫ Sin conexión</span
+          >
+        </p>
+      </div>
+    </footer>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     ESTILOS
+     ══════════════════════════════════════════════════════════ -->
+<style>
+  .fondopie {
+    background-color: #f6efd5;
+    width: 130%;
+    padding-top: 5%;
+    padding-bottom: 5%;
+    border-radius: 10px;
+  }
+
+  /* ── Pantalla completa ──────────────────────────────────────── */
+  .login-screen {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* Cambia 'bg.svg' por el nombre de tu imagen que pongas en src/assets/ */
+    background-image: url("../assets/bg.svg");
+    background-size: cover;
+    background-position: center;
+    background-color: var(
+      --bg-base
+    ); /* Color de fondo por si la imagen tarda en cargar */
+  }
+  /* ── Resplandor dorado en la esquina superior ───────────────── */
+
+  /* ── Contenedor principal ───────────────────────────────────── */
+  .login-container {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    width: 100%;
+    max-width: 480px;
+    padding: 0 24px;
+  }
+
+  /* ── Header / Logo ──────────────────────────────────────────── */
+  .titulo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .login-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .login-title {
+    font-size: 3rem;
+    font-weight: 800;
+    color: white;
+    background-clip: text;
+    letter-spacing: -0.02em;
+  }
+
+  .login-subtitle {
+    font-size: 1.3rem;
+    color: ghostwhite;
+    margin-top: 2px;
+  }
+
+  /* ── Panel ──────────────────────────────────────────────────── */
+  .login-panel {
+    width: 100%;
+    /*  background: var(--glass-bg);*/
+    background-color: #f6efd5;
+    outline: 12px solid #580201;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 8%;
+    padding: 8% 3%;
+    box-shadow: var(--shadow-lg), var(--shadow-gold);
+  }
+
+  /* ── Vista: Lista de usuarios ───────────────────────────────── */
+  .view-users {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  :global(.user-card) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-direction: row;
+    gap: 12px;
+    padding: 12px 16px;
+    background-color: #580201;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    user-select: none;
+  }
+
+  :global(.user-card:hover) {
+    background: #26304c;
+    border-color: var(--border-accent);
+    transform: translateX(4px);
+    box-shadow: -3px 0 0 var(--accent-gold);
+  }
+
+  :global(.user-card:active) {
+    transform: translateX(2px);
+  }
+
+  :global(.user-card.skeleton) {
+    height: 72px;
+    cursor: default;
+    background: linear-gradient(
+      90deg,
+      var(--bg-elevated) 25%,
+      var(--bg-hover) 50%,
+      var(--bg-elevated) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  :global(.user-avatar) {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    border: 2px solid transparent;
+    transition: border-color var(--transition-fast);
+  }
+
+  :global(.user-avatar--admin) {
+    background: rgba(240, 180, 41, 0.15);
+    color: var(--accent-gold);
+  }
+  :global(.user-avatar--cajero) {
+    background: rgba(72, 246, 59, 0.15);
+    color: var(--accent-green);
+  }
+
+  :global(.user-card:hover .user-avatar--admin) {
+    border-color: var(--accent-gold);
+  }
+  :global(.user-card:hover .user-avatar--cajero) {
+    border-color: var(--accent-green);
+  }
+
+  .user-info {
+    flex: 1;
+  }
+  :global(.user-name) {
+    font-size: 120%;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .user-role {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  :global(.user-arrow) {
+    color: white;
+    transition:
+      transform var(--transition-fast),
+      color var(--transition-fast);
+  }
+  :global(.user-card:hover .user-arrow) {
+    transform: translateX(4px);
+    color: var(--text-primary);
+  }
+
+  /* ── Vista: PIN ─────────────────────────────────────────────── */
+  .view-pin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  .view-pin.hidden {
+    display: none;
+  }
+  .view-users.hidden {
+    display: none;
+  }
+
+  /* Usuario seleccionado */
+  .selected-user {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #26304c;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .selected-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .selected-name {
+    font-size: 120%;
+    font-weight: 600;
+    color: var(--text-primary) !important;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .btn-back {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: rgba(255, 70, 70, 0.583);
+    font-size: 1rem;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition:
+      color var(--transition-fast),
+      background var(--transition-fast);
+    white-space: nowrap;
+  }
+  .btn-back:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  /* Puntos PIN */
+  .pin-dots {
+    display: flex;
+    gap: 12px;
+  }
+
+  .dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--border-default);
+    background: #26304c9b;
+    transition: all var(--transition-fast);
+  }
+
+  .dot.filled {
+    background: var(--accent-gold);
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 10px rgba(240, 180, 41, 0.5);
+    animation: pulse-gold 0.3s ease;
+  }
+
+  .dot.error {
+    background: var(--accent-red);
+    border-color: var(--accent-red);
+  }
+
+  /* Error message */
+  .pin-error {
+    font-size: 1rem;
+    color: var(--accent-red) !important;
+    text-align: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+  .pin-error.hidden {
+    display: none;
+  }
+
+  /* Teclado numérico */
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+  }
+
+  .num-key {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 60px;
+    background: #580201;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    font-family: var(--font-sans);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #f6efd5;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    user-select: none;
+  }
+
+  .num-key:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+    transform: scale(1.03);
+  }
+  .num-key:active {
+    transform: scale(0.97);
+    background: var(--bg-card);
+  }
+
+  .num-key--wide {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+  }
+  .num-key--confirm {
+    background: var(--accent-gold);
+    color: var(--text-inverse);
+    border-color: var(--accent-gold);
+    font-size: 1.25rem;
+  }
+  .num-key--confirm:hover {
+    background: #e0a820;
+    transform: scale(1.03);
+    box-shadow: 0 4px 16px rgba(240, 180, 41, 0.4);
+  }
+
+  /* ── Pie de página ──────────────────────────────────────────── */
+  .login-footer {
+    text-align: center;
+  }
+  .login-footer p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  .sync-indicator {
+    font-size: 0.8125rem;
+  }
+</style>
+
+<!-- ══════════════════════════════════════════════════════════
+     LÓGICA DE CLIENTE
+     ══════════════════════════════════════════════════════════ -->
+<script>
+  import { api } from "../lib/api";
+  import { saveSession } from "../lib/auth";
+
+  // ── Tipos ───────────────────────────────────────────────────
+  interface Usuario {
+    id: string;
+    nombre: string;
+    rol: "ADMIN" | "CAJERO";
+    activo: boolean;
+  }
+
+  // ── Estado ──────────────────────────────────────────────────
+  let usuarioSeleccionado: Usuario | null = null;
+  let pinActual = "";
+  const PIN_MAX = 6;
+
+  // ── Referencias DOM ─────────────────────────────────────────
+  const viewUsers = document.getElementById("view-users")!;
+  const viewPin = document.getElementById("view-pin")!;
+  const pinError = document.getElementById("pin-error")!;
+  const numpad = document.getElementById("numpad")!;
+  const btnBack = document.getElementById("btn-back")!;
+  const selectedName = document.getElementById("selected-name")!;
+  const selectedBadge = document.getElementById("selected-badge")!;
+  const selectedAvatar = document.getElementById("selected-avatar")!;
+  const syncStatus = document.getElementById("sync-status")!;
+
+  // ── Renderizar usuarios ──────────────────────────────────────
+  async function cargarUsuarios() {
+    let usuarios: Usuario[] = [];
+
+    try {
+      usuarios = await api.listar_usuarios();
+    } catch {
+      console.error("[LoginScreen] No se pudieron cargar los usuarios.");
+    }
+
+    renderizarUsuarios(usuarios);
+  }
+
+  function renderizarUsuarios(usuarios: Usuario[]) {
+    viewUsers.innerHTML = "";
+
+    if (usuarios.length === 0) {
+      viewUsers.innerHTML = `
+      <p style="text-align:center;color:var(--text-muted);padding:24px 0;">
+        No hay usuarios registrados.
+      </p>`;
+      return;
+    }
+
+    usuarios.forEach((u) => {
+      const iniciales = u.nombre
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+      const rolLabel = u.rol === "ADMIN" ? "Administrador" : "Cajero";
+      const rolClass = u.rol === "ADMIN" ? "admin" : "cajero";
+      const badgeClass = u.rol === "ADMIN" ? "badge-admin" : "badge-cajero";
+
+      const card = document.createElement("div");
+      card.className = "user-card animate-fade-in";
+      card.setAttribute("role", "listitem");
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("aria-label", `${u.nombre} — ${rolLabel}`);
+      card.innerHTML = `
+      <div class="user-avatar user-avatar--${rolClass}" aria-hidden="true">${iniciales}</div>
+      <p class="user-name">${u.nombre}</p>
+      <span class="user-arrow" aria-hidden="true">→</span>
+      <p class="user-role"><span class="badge ${badgeClass}">${rolLabel}</span></p>
+    `;
+
+      card.addEventListener("click", () =>
+        seleccionarUsuario(u, iniciales, rolLabel, badgeClass),
+      );
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ")
+          seleccionarUsuario(u, iniciales, rolLabel, badgeClass);
+      });
+
+      viewUsers.appendChild(card);
+    });
+  }
+
+  // ── Seleccionar usuario → mostrar PIN ───────────────────────
+  function seleccionarUsuario(
+    usuario: Usuario,
+    iniciales: string,
+    rolLabel: string,
+    badgeClass: string,
+  ) {
+    usuarioSeleccionado = usuario;
+    pinActual = "";
+
+    // Poblar display de usuario seleccionado
+    selectedName.textContent = usuario.nombre;
+    selectedBadge.textContent = rolLabel;
+    selectedBadge.className = `badge ${badgeClass}`;
+    selectedAvatar.textContent = iniciales;
+    selectedAvatar.className = `selected-avatar user-avatar--${usuario.rol.toLowerCase()}`;
+
+    // Limpiar estado visual
+    actualizarPuntos();
+    pinError.classList.add("hidden");
+
+    // Transición de vistas
+    viewUsers.classList.add("hidden");
+    viewPin.classList.remove("hidden");
+    viewPin.classList.add("animate-fade-in");
+  }
+
+  // ── Teclado numérico ────────────────────────────────────────
+  numpad.addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest(
+      ".num-key",
+    ) as HTMLButtonElement | null;
+    if (!btn) return;
+
+    const btnId = btn.id;
+
+    if (btnId === "key-clear") {
+      pinActual = pinActual.slice(0, -1);
+      pinError.classList.add("hidden");
+      actualizarPuntos();
+      return;
+    }
+
+    if (btnId === "key-confirm") {
+      verificarPin();
+      return;
+    }
+
+    const valor = btn.dataset["value"];
+    if (valor && pinActual.length < PIN_MAX) {
+      pinActual += valor;
+      actualizarPuntos();
+      // Auto-verificar si llegamos al máximo de dígitos
+      if (pinActual.length === PIN_MAX) setTimeout(verificarPin, 180);
+    }
+  });
+
+  // ── Soporte teclado físico ────────────────────────────────
+  document.addEventListener("keydown", (e) => {
+    if (viewPin.classList.contains("hidden")) return;
+
+    if (e.key >= "0" && e.key <= "9" && pinActual.length < PIN_MAX) {
+      pinActual += e.key;
+      actualizarPuntos();
+      if (pinActual.length === PIN_MAX) setTimeout(verificarPin, 180);
+    } else if (e.key === "Backspace") {
+      pinActual = pinActual.slice(0, -1);
+      pinError.classList.add("hidden");
+      actualizarPuntos();
+    } else if (e.key === "Enter") {
+      verificarPin();
+    } else if (e.key === "Escape") {
+      volverAUsuarios();
+    }
+  });
+
+  // ── Actualizar indicador de puntos ──────────────────────────
+  function actualizarPuntos() {
+    for (let i = 0; i < PIN_MAX; i++) {
+      const dot = document.getElementById(`dot-${i}`)!;
+      dot.classList.toggle("filled", i < pinActual.length);
+      dot.classList.remove("error");
+    }
+  }
+
+  // ── Verificar PIN ────────────────────────────────────────────
+  async function verificarPin() {
+    if (!usuarioSeleccionado || pinActual.length === 0) return;
+
+    const confirmBtn = document.getElementById(
+      "key-confirm",
+    ) as HTMLButtonElement;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "...";
+
+    try {
+      const ok = await api.verificar_pin(
+        usuarioSeleccionado.id,
+        pinActual,
+      );
+
+      if (ok) {
+        // Guardar sesión usando la utilidad centralizada
+        saveSession({
+          usuarioId: usuarioSeleccionado.id,
+          nombre: usuarioSeleccionado.nombre,
+          rol: usuarioSeleccionado.rol,
+        });
+
+        // Redirigir según rol (siempre a /caja como punto de entrada)
+        window.location.href = '/caja';
+      } else {
+        mostrarErrorPin();
+      }
+    } catch (err) {
+      console.error("[LoginScreen] Error al verificar PIN:", err);
+      mostrarErrorPin();
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "✓";
+    }
+  }
+
+  // ── Mostrar error PIN ────────────────────────────────────────
+  function mostrarErrorPin() {
+    pinActual = "";
+    pinError.classList.remove("hidden");
+
+    // Animación de sacudida en los puntos
+    const dots = document.querySelectorAll(".dot");
+    dots.forEach((d) => {
+      d.classList.remove("filled");
+      d.classList.add("error");
+    });
+
+    setTimeout(() => {
+      dots.forEach((d) => d.classList.remove("error"));
+    }, 600);
+  }
+
+  // ── Volver a selección de usuarios ──────────────────────────
+  function volverAUsuarios() {
+    usuarioSeleccionado = null;
+    pinActual = "";
+    pinError.classList.add("hidden");
+    viewPin.classList.add("hidden");
+    viewUsers.classList.remove("hidden");
+    viewUsers.classList.add("animate-fade-in");
+    actualizarPuntos();
+  }
+
+  btnBack.addEventListener("click", volverAUsuarios);
+
+  // ── Estado de conectividad ──────────────────────────────────
+  function actualizarEstadoConexion() {
+    const online = navigator.onLine;
+    syncStatus.textContent = online ? "🟢 En línea" : "⚫ Sin conexión";
+    syncStatus.style.color = online
+      ? "var(--accent-green)"
+      : "var(--text-muted)";
+  }
+
+  window.addEventListener("online", actualizarEstadoConexion);
+  window.addEventListener("offline", actualizarEstadoConexion);
+  actualizarEstadoConexion();
+
+  // ── Inicializar ─────────────────────────────────────────────
+  cargarUsuarios();
+</script>

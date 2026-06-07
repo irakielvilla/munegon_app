@@ -1,0 +1,39 @@
+{
+  "name": "munegon-pos",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "tauri": "tauri",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "node --env-file=.env --import=tsx/esm prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@astrojs/preact": "^5.1.5",
+    "@libsql/client": "^0.17.3",
+    "@prisma/adapter-libsql": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@supabase/supabase-js": "^2.107.0",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "astro": "^6.4.4",
+    "crypto-js": "^4.2.0",
+    "preact": "^10.29.2",
+    "prisma": "^7.8.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/crypto-js": "^4.2.2",
+    "tsx": "^4.22.4",
+    "typescript": "~5.6.2"
+  },
+  "prisma": {
+    "seed": "node --env-file=.env --import=tsx/esm prisma/seed.ts"
+  }
+}

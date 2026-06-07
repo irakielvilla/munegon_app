@@ -1,0 +1,32 @@
+---
+// Muñegon POS — Módulo de Reportes
+// Acceso: solo ADMIN
+import Sidebar from '../components/Sidebar';
+import AuthGuard from '../components/AuthGuard';
+import TablaCortes from '../components/reportes/TablaCortes';
+import '../styles/sidebar.css';
+import '../styles/admin.css';
+---
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reportes — Muñegon POS</title>
+    <meta name="description" content="Reportes y cortes de caja Muñegon POS" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="app-layout">
+      <Sidebar client:only="preact" />
+      <div class="app-content">
+        <AuthGuard rol="ADMIN" client:only="preact">
+          <TablaCortes client:only="preact" />
+        </AuthGuard>
+      </div>
+    </div>
+  </body>
+</html>
