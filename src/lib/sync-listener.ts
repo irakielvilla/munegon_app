@@ -87,8 +87,10 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
             timestamp: new Date().toISOString(),
             synced: result.synced,
           });
+          // alert(`Sincronización exitosa: ${result.synced} subidos.`);
         } else {
           console.error('[Sync] ❌ Error en sincronización:', result.error);
+          alert('Error sincronizando con la Nube: ' + result.error);
           await emit('sync-fallido', {
             timestamp: new Date().toISOString(),
             error: result.error,
@@ -104,10 +106,12 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
           timestamp: new Date().toISOString(),
           error: err.message,
         });
+        alert('Error fatal en el worker: ' + err.message);
         worker.terminate();
       };
     } catch (err) {
       console.error('[Sync] ❌ Error al cargar pendientes:', err);
+      alert('Error al cargar pendientes locales: ' + String(err));
     }
   });
 
