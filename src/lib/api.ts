@@ -37,10 +37,10 @@ export interface Usuario {
 }
 
 export interface ResumenDia {
-  bs_efectivo: string;
-  bs_debito: string;
-  bs_pago_movil: string;
-  usd_efectivo: string;
+  bsEfectivo: string;
+  bsDebito: string;
+  bsPagoMovil: string;
+  usdEfectivo: string;
 }
 
 export interface LineaInput {
@@ -201,10 +201,10 @@ export const api = {
     });
 
     return {
-      bs_efectivo: resumen.bs_efectivo.toFixed(2),
-      bs_debito: resumen.bs_debito.toFixed(2),
-      bs_pago_movil: resumen.bs_pago_movil.toFixed(2),
-      usd_efectivo: resumen.usd_efectivo.toFixed(2)
+      bsEfectivo: resumen.bs_efectivo.toFixed(2),
+      bsDebito: resumen.bs_debito.toFixed(2),
+      bsPagoMovil: resumen.bs_pago_movil.toFixed(2),
+      usdEfectivo: resumen.usd_efectivo.toFixed(2)
     };
   },
 
@@ -246,7 +246,7 @@ export const api = {
     if (isTauri()) return invokeTauri<string>('generar_pdf_corte_z', payload);
     // Web: Crear el registro Z en Supabase
     const id = crypto.randomUUID();
-    const total_bs = (await api.resumen_ventas_dia()).bs_efectivo; // Simplificado web
+    const total_bs = (await api.resumen_ventas_dia()).bsEfectivo; // Simplificado web
     
     await supabase.from('CorteCaja').insert([{
       id,
