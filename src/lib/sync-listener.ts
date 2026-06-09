@@ -48,12 +48,7 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
       ]);
 
       const total = ventas.length + productos.length + logs.length;
-      if (total === 0) {
-        console.log('[Sync] ✅ Nada que sincronizar.');
-        return;
-      }
-
-      console.log(`[Sync] 📦 Pendientes: ${ventas.length} ventas, ${productos.length} productos, ${logs.length} logs`);
+      console.log(`[Sync] 📦 Pendientes para subir: ${ventas.length} ventas, ${productos.length} productos, ${logs.length} logs`);
 
       // Delegar al Worker (no bloquea la UI)
       const worker = new Worker(
