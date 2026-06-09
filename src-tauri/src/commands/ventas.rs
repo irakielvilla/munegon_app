@@ -479,10 +479,39 @@ pub fn obtener_logs_pendientes() -> Result<Vec<serde_json::Value>, String> {
 }
 
 #[tauri::command]
+pub fn obtener_cortes_pendientes() -> Result<Vec<serde_json::Value>, String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, tipo, usuarioId, totalCalculado, totalDeclarado, diferencia, creadoEn
+             FROM CorteCaja WHERE isSynced = 0",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "tipo": row.get::<_, String>(1)?,
+                "usuarioId": row.get::<_, String>(2)?,
+                "totalCalculado": row.get::<_, String>(3)?,
+                "totalDeclarado": row.get::<_, String>(4)?,
+                "diferencia": row.get::<_, String>(5)?,
+                "creadoEn": row.get::<_, String>(6)?,
+                "isSynced": false,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
+
+    rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
 pub fn marcar_sincronizados(
     venta_ids: Vec<String>,
     producto_ids: Vec<String>,
     log_ids: Vec<String>,
+    corte_ids: Vec<String>,
 ) -> Result<(), String> {
     let conn = open_db().map_err(|e| e.to_string())?;
 
@@ -501,6 +530,12 @@ pub fn marcar_sincronizados(
     // Marcar logs
     for id in &log_ids {
         conn.execute("UPDATE LogCambio SET isSynced = 1 WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+    }
+
+    // Marcar cortes
+    for id in &corte_ids {
+        conn.execute("UPDATE CorteCaja SET isSynced = 1 WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
     }
 
@@ -601,6 +636,7 @@ pub fn verificar_pin(usuario_id: String, pin: String) -> Result<bool, String> {
 pub struct PullPayload {
     usuarios: Vec<serde_json::Value>,
     productos: Vec<serde_json::Value>,
+    cortes: Vec<serde_json::Value>,
 }
 
 #[tauri::command]
@@ -610,6 +646,7 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
 
     let mut pulled_user_ids = Vec::new();
     let mut pulled_product_ids = Vec::new();
+    let mut pulled_corte_ids = Vec::new();
 
     // 1. Guardar Usuarios
     for u in payload.usuarios {
@@ -656,7 +693,30 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
         ).unwrap_or_default();
     }
 
-    // 3. Limpiar / desactivar usuarios eliminados en Supabase
+    // 3. Guardar Cortes de Caja
+    for c in payload.cortes {
+        let id = c["id"].as_str().unwrap_or("");
+        if !id.is_empty() {
+            pulled_corte_ids.push(id.to_string());
+        }
+        let tipo = c["tipo"].as_str().unwrap_or("X");
+        let usuario_id = c["usuarioId"].as_str().unwrap_or("");
+        let total_calculado = c["totalCalculado"].as_str().unwrap_or("0.00");
+        let total_declarado = c["totalDeclarado"].as_str().unwrap_or("");
+        let diferencia = c["diferencia"].as_str().unwrap_or("0.00");
+        let creado_en = c["creadoEn"].as_str().unwrap_or("");
+
+        tx.execute(
+            "INSERT INTO CorteCaja (id, tipo, usuarioId, totalCalculado, totalDeclarado, diferencia, isSynced, creadoEn)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7)
+             ON CONFLICT(id) DO UPDATE SET 
+             tipo=excluded.tipo, usuarioId=excluded.usuarioId, totalCalculado=excluded.totalCalculado,
+             totalDeclarado=excluded.totalDeclarado, diferencia=excluded.diferencia, isSynced=1, creadoEn=excluded.creadoEn",
+            params![id, tipo, usuario_id, total_calculado, total_declarado, diferencia, creado_en],
+        ).unwrap_or_default();
+    }
+
+    // 4. Limpiar / desactivar usuarios eliminados en Supabase
     if !pulled_user_ids.is_empty() {
         let placeholders = pulled_user_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
         let delete_sql = format!(
@@ -677,7 +737,7 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
         tx.execute(&deactivate_sql, params_from_iter(params.iter())).unwrap_or_default();
     }
 
-    // 4. Limpiar / desactivar productos eliminados en Supabase
+    // 5. Limpiar / desactivar productos eliminados en Supabase
     if !pulled_product_ids.is_empty() {
         let placeholders = pulled_product_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
         let delete_sql = format!(
@@ -694,6 +754,19 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
             placeholders
         );
         tx.execute(&deactivate_sql, params_from_iter(params.iter())).unwrap_or_default();
+    }
+
+    // 6. Limpiar cortes eliminados en Supabase
+    if !pulled_corte_ids.is_empty() {
+        let placeholders = pulled_corte_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        let delete_sql = format!(
+            "DELETE FROM CorteCaja 
+             WHERE id NOT IN ({}) 
+             AND id NOT IN (SELECT DISTINCT corteCajaId FROM Venta WHERE corteCajaId IS NOT NULL)",
+            placeholders
+        );
+        let params: Vec<&str> = pulled_corte_ids.iter().map(|s| s.as_str()).collect();
+        tx.execute(&delete_sql, params_from_iter(params.iter())).unwrap_or_default();
     }
 
     tx.commit().map_err(|e| e.to_string())?;

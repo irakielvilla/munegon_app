@@ -24,13 +24,14 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
     try {
       console.log('[Sync] 🔔 Iniciando sincronización...');
 
-      const [ventas, productos, logs] = await Promise.all([
+      const [ventas, productos, logs, cortes] = await Promise.all([
         invoke<Record<string, unknown>[]>('obtener_ventas_pendientes'),
         invoke<Record<string, unknown>[]>('obtener_productos_pendientes'),
         invoke<Record<string, unknown>[]>('obtener_logs_pendientes'),
+        invoke<Record<string, unknown>[]>('obtener_cortes_pendientes'),
       ]);
 
-      console.log(`[Sync] 📦 Pendientes para subir: ${ventas.length} ventas, ${productos.length} productos, ${logs.length} logs`);
+      console.log(`[Sync] 📦 Pendientes para subir: ${ventas.length} ventas, ${productos.length} productos, ${logs.length} logs, ${cortes.length} cortes`);
 
       // ── EJECUTAR SYNC DIRECTAMENTE EN EL HILO PRINCIPAL ──
       const supabase = createClient(config.supabaseUrl, config.supabaseKey);
@@ -38,6 +39,7 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
       const ventaIds: string[] = [];
       const productoIds: string[] = [];
       const logIds: string[] = [];
+      const corteIds: string[] = [];
 
       // 1. Ventas y sus Lineas
       if (ventas.length > 0) {
@@ -83,29 +85,42 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
         totalSynced += logs.length;
       }
 
-      // 4. Pull
+      // 4. Cortes
+      if (cortes.length > 0) {
+        const cortesData = cortes.map((c) => ({ ...c, isSynced: true }));
+        const { error } = await supabase.from('CorteCaja').upsert(cortesData, { onConflict: 'id' });
+        if (error) throw new Error(`Cortes de Caja: ${error.message}`);
+        corteIds.push(...cortes.map((c) => c['id'] as string));
+        totalSynced += cortes.length;
+      }
+
+      // 5. Pull
       const { data: pullUsuarios, error: uErr } = await supabase.from('Usuario').select('*');
       if (uErr) console.error('[Sync] Error pull usuarios:', uErr.message);
 
       const { data: pullProductos, error: pErr } = await supabase.from('Producto').select('*');
       if (pErr) console.error('[Sync] Error pull productos:', pErr.message);
 
+      const { data: pullCortes, error: cErr } = await supabase.from('CorteCaja').select('*');
+      if (cErr) console.error('[Sync] Error pull cortes:', cErr.message);
+
       const pullData = {
         usuarios: pullUsuarios || [],
-        productos: pullProductos || []
+        productos: pullProductos || [],
+        cortes: pullCortes || []
       };
 
-      // 5. Guardar Pull en SQLite local
+      // 6. Guardar Pull en SQLite local
       await invoke('guardar_datos_pull', { payload: pullData });
-      console.log(`[Sync] 📥 Pull guardado: ${pullData.usuarios.length} usuarios.`);
+      console.log(`[Sync] 📥 Pull guardado: ${pullData.usuarios.length} usuarios, ${pullData.productos.length} productos, ${pullData.cortes.length} cortes.`);
 
-      // 6. Marcar Push como sincronizado en SQLite
+      // 7. Marcar Push como sincronizado en SQLite
       if (totalSynced > 0) {
-        await invoke('marcar_sincronizados', { ventaIds, productoIds, logIds });
+        await invoke('marcar_sincronizados', { ventaIds, productoIds, logIds, corteIds });
         console.log(`[Sync] ✅ SQLite actualizado. ${totalSynced} registros marcados.`);
       }
 
-      alert(`¡Sincronización Completada!\n\nSubidos: ${totalSynced} registros\nDescargados: ${pullData.usuarios.length} usuarios y ${pullData.productos.length} productos.`);
+      alert(`¡Sincronización Completada!\n\nSubidos: ${totalSynced} registros\nDescargados: ${pullData.usuarios.length} usuarios, ${pullData.productos.length} productos y ${pullData.cortes.length} cortes.`);
 
       await emit('sync-completado', {
         timestamp: new Date().toISOString(),

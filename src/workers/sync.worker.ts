@@ -25,6 +25,7 @@ interface SyncPayload {
   ventas: Record<string, unknown>[];
   productos: Record<string, unknown>[];
   logs: Record<string, unknown>[];
+  cortes: Record<string, unknown>[];
 }
 
 interface SyncResult {
@@ -34,18 +35,20 @@ interface SyncResult {
   ventaIds: string[];
   productoIds: string[];
   logIds: string[];
+  corteIds: string[];
   error?: string;
   pullData?: {
     usuarios: any[];
     productos: any[];
+    cortes: any[];
   };
 }
 
 // ── Entry point del worker ────────────────────────────────────
 
 self.onmessage = async (e: MessageEvent<SyncPayload>) => {
-  const { supabaseUrl, supabaseKey, ventas, productos, logs } = e.data;
-  const result = await ejecutarSync(supabaseUrl, supabaseKey, ventas, productos, logs);
+  const { supabaseUrl, supabaseKey, ventas, productos, logs, cortes } = e.data;
+  const result = await ejecutarSync(supabaseUrl, supabaseKey, ventas, productos, logs, cortes);
   self.postMessage(result);
 };
 
@@ -57,11 +60,13 @@ async function ejecutarSync(
   ventas: Record<string, unknown>[],
   productos: Record<string, unknown>[],
   logs: Record<string, unknown>[],
+  cortes: Record<string, unknown>[],
 ): Promise<SyncResult> {
   let totalSynced = 0;
   const ventaIds: string[] = [];
   const productoIds: string[] = [];
   const logIds: string[] = [];
+  const corteIds: string[] = [];
 
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -96,12 +101,25 @@ async function ejecutarSync(
       totalSynced += logs.length;
     }
 
-    // ── 4. Pull de Data Web (Usuarios y Productos) ────────────
+    // ── 4. Cortes de Caja ─────────────────────────────────────
+    if (cortes.length > 0) {
+      const { error } = await supabase
+        .from('CorteCaja')
+        .upsert(cortes, { onConflict: 'id' });
+      if (error) throw new Error(`Cortes de Caja: ${error.message}`);
+      corteIds.push(...cortes.map((c) => c['id'] as string));
+      totalSynced += cortes.length;
+    }
+
+    // ── 5. Pull de Data Web (Usuarios, Productos y Cortes) ────
     const { data: pullUsuarios, error: uErr } = await supabase.from('Usuario').select('*');
     if (uErr) console.error('[SyncWorker] Error pull usuarios:', uErr.message);
 
     const { data: pullProductos, error: pErr } = await supabase.from('Producto').select('*');
     if (pErr) console.error('[SyncWorker] Error pull productos:', pErr.message);
+
+    const { data: pullCortes, error: cErr } = await supabase.from('CorteCaja').select('*');
+    if (cErr) console.error('[SyncWorker] Error pull cortes:', cErr.message);
 
     return { 
       ok: true, 
@@ -109,14 +127,16 @@ async function ejecutarSync(
       ventaIds, 
       productoIds, 
       logIds,
+      corteIds,
       pullData: {
         usuarios: pullUsuarios || [],
-        productos: pullProductos || []
+        productos: pullProductos || [],
+        cortes: pullCortes || []
       }
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[SyncWorker] Error:', message);
-    return { ok: false, synced: totalSynced, ventaIds, productoIds, logIds, error: message };
+    return { ok: false, synced: totalSynced, ventaIds, productoIds, logIds, corteIds, error: message };
   }
 }
