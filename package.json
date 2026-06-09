@@ -24,6 +24,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "astro": "^6.4.4",
     "crypto-js": "^4.2.0",
+    "jspdf": "^4.2.1",
     "preact": "^10.29.2",
     "prisma": "^7.8.0"
   },

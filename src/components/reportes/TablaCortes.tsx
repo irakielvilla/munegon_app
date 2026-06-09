@@ -5,7 +5,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from 'preact/hooks';
-import { api, ResumenDia, ConfigApp } from '../../lib/api';
+import { api, type ResumenDia, type ConfigApp } from '../../lib/api';
 import { requireAuth, getSession } from '@lib/auth';
 
 // ── Tipos ─────────────────────────────────────────────────────
