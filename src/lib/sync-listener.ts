@@ -1,117 +1,104 @@
 // ══════════════════════════════════════════════════════════════
 // MUÑEGON POS — Listener de Eventos de Sincronización
 // Escucha el evento "ejecutar-sincronizacion" disparado por Rust
-// y delega el trabajo al Web Worker de sync.
+// y realiza la sincronización directamente en el hilo principal.
 //
 // FLUJO:
 //   Rust dispara evento → listener llama invoke para obtener
-//   registros pendientes → los envía al Worker → Worker sube a
-//   Supabase → listener recibe IDs y los marca como sincronizados
-//   vía otro invoke a Rust.
+//   registros pendientes → sube a Supabase directamente →
+//   actualiza SQLite local.
 // ══════════════════════════════════════════════════════════════
 
-import { listen, emit } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
+import { createClient } from '@supabase/supabase-js';
 
 export interface SyncConfig {
   supabaseUrl: string;
   supabaseKey: string;
 }
 
-interface SyncResult {
-  ok: boolean;
-  synced: number;
-  ventaIds: string[];
-  productoIds: string[];
-  logIds: string[];
-  error?: string;
-  pullData?: {
-    usuarios: any[];
-    productos: any[];
-  };
-}
-
-/**
- * Inicia el listener del evento Tauri.
- * Debe llamarse una sola vez al iniciar la aplicación (en BaseLayout).
- */
 export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
   await listen('ejecutar-sincronizacion', async () => {
-    console.log('[Sync] 🔔 Evento recibido de Rust. Cargando registros pendientes...');
-
     try {
-      // Obtener registros pendientes via Rust (que lee SQLite)
+      console.log('[Sync] 🔔 Evento recibido de Rust. Cargando registros pendientes...');
+
       const [ventas, productos, logs] = await Promise.all([
         invoke<Record<string, unknown>[]>('obtener_ventas_pendientes'),
         invoke<Record<string, unknown>[]>('obtener_productos_pendientes'),
         invoke<Record<string, unknown>[]>('obtener_logs_pendientes'),
       ]);
 
-      const total = ventas.length + productos.length + logs.length;
       console.log(`[Sync] 📦 Pendientes para subir: ${ventas.length} ventas, ${productos.length} productos, ${logs.length} logs`);
 
-      // Delegar al Worker (no bloquea la UI)
-      const worker = new Worker(
-        new URL('../workers/sync.worker.ts', import.meta.url),
-        { type: 'module' },
-      );
+      // ── EJECUTAR SYNC DIRECTAMENTE EN EL HILO PRINCIPAL ──
+      const supabase = createClient(config.supabaseUrl, config.supabaseKey);
+      let totalSynced = 0;
+      const ventaIds: string[] = [];
+      const productoIds: string[] = [];
+      const logIds: string[] = [];
 
-      worker.postMessage({
-        supabaseUrl: config.supabaseUrl,
-        supabaseKey: config.supabaseKey,
-        ventas,
-        productos,
-        logs,
+      // 1. Ventas
+      if (ventas.length > 0) {
+        const { error } = await supabase.from('Venta').upsert(ventas, { onConflict: 'id' });
+        if (error) throw new Error(`Ventas: ${error.message}`);
+        ventaIds.push(...ventas.map((v) => v['id'] as string));
+        totalSynced += ventas.length;
+      }
+
+      // 2. Productos
+      if (productos.length > 0) {
+        const { error } = await supabase.from('Producto').upsert(productos, { onConflict: 'id' });
+        if (error) throw new Error(`Productos: ${error.message}`);
+        productoIds.push(...productos.map((p) => p['id'] as string));
+        totalSynced += productos.length;
+      }
+
+      // 3. Logs
+      if (logs.length > 0) {
+        const { error } = await supabase.from('LogCambio').upsert(logs, { onConflict: 'id' });
+        if (error) throw new Error(`Logs: ${error.message}`);
+        logIds.push(...logs.map((l) => l['id'] as string));
+        totalSynced += logs.length;
+      }
+
+      // 4. Pull
+      const { data: pullUsuarios, error: uErr } = await supabase.from('Usuario').select('*');
+      if (uErr) console.error('[Sync] Error pull usuarios:', uErr.message);
+
+      const { data: pullProductos, error: pErr } = await supabase.from('Producto').select('*');
+      if (pErr) console.error('[Sync] Error pull productos:', pErr.message);
+
+      const pullData = {
+        usuarios: pullUsuarios || [],
+        productos: pullProductos || []
+      };
+
+      // 5. Guardar Pull en SQLite local
+      await invoke('guardar_datos_pull', { payload: pullData });
+      console.log(`[Sync] 📥 Pull guardado: ${pullData.usuarios.length} usuarios.`);
+
+      // 6. Marcar Push como sincronizado en SQLite
+      if (totalSynced > 0) {
+        await invoke('marcar_sincronizados', { ventaIds, productoIds, logIds });
+        console.log(`[Sync] ✅ SQLite actualizado. ${totalSynced} registros marcados.`);
+      }
+
+      alert(`¡Sincronización Completada!\n\nSubidos: ${totalSynced} registros\nDescargados: ${pullData.usuarios.length} usuarios y ${pullData.productos.length} productos.`);
+
+      await emit('sync-completado', {
+        timestamp: new Date().toISOString(),
+        synced: totalSynced,
       });
 
-      worker.onmessage = async (e: MessageEvent<SyncResult>) => {
-        const result = e.data;
-
-        if (result.ok) {
-          console.log(`[Sync] ✅ Subidos a Supabase: ${result.synced} registros`);
-
-          // Marcar como sincronizados en SQLite (vía Rust)
-          await invoke('marcar_sincronizados', {
-            ventaIds: result.ventaIds,
-            productoIds: result.productoIds,
-            logIds: result.logIds,
-          });
-
-          // Guardar datos descargados (Pull)
-          if (result.pullData) {
-            await invoke('guardar_datos_pull', { payload: result.pullData });
-            console.log(`[Sync] 📥 Pull guardado localmente: ${result.pullData.usuarios.length} usuarios, ${result.pullData.productos.length} productos`);
-          }
-
-          await emit('sync-completado', {
-            timestamp: new Date().toISOString(),
-            synced: result.synced,
-          });
-          // alert(`Sincronización exitosa: ${result.synced} subidos.`);
-        } else {
-          console.error('[Sync] ❌ Error en sincronización:', result.error);
-          alert('Error sincronizando con la Nube: ' + result.error);
-          await emit('sync-fallido', {
-            timestamp: new Date().toISOString(),
-            error: result.error,
-          });
-        }
-
-        worker.terminate();
-      };
-
-      worker.onerror = async (err) => {
-        console.error('[Sync] ❌ Error fatal en el worker:', err.message);
-        await emit('sync-fallido', {
-          timestamp: new Date().toISOString(),
-          error: err.message,
-        });
-        alert('Error fatal en el worker: ' + err.message);
-        worker.terminate();
-      };
-    } catch (err) {
-      console.error('[Sync] ❌ Error al cargar pendientes:', err);
-      alert('Error al cargar pendientes locales: ' + String(err));
+    } catch (err: any) {
+      console.error('[Sync] ❌ Error en sincronización:', err);
+      alert('Error en Sincronización: ' + err.message);
+      await emit('sync-fallido', {
+        timestamp: new Date().toISOString(),
+        error: err.message,
+      });
     }
   });
 
