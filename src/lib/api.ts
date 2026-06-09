@@ -56,8 +56,8 @@ const supabaseKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || import.meta.env.
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Detección de entorno: Si Tauri está inyectado, estamos en Escritorio
-// Nota: en Tauri v2 se inyecta __TAURI_INTERNALS__ en window.
-export const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+// Nota: en Tauri v2 puede ser __TAURI__, __TAURI_INTERNALS__ o __TAURI_IPC__
+export const isTauri = () => typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window || '__TAURI_IPC__' in window);
 
 // Wrapper genérico para comandos
 // Intentamos cargar dinámicamente @tauri-apps/api/core para no romper la web.
