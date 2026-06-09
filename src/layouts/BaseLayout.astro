@@ -36,14 +36,14 @@ const { title = 'Muñegon POS' } = Astro.props;
     <script>
       import { iniciarSyncListener } from '../lib/sync-listener';
 
-      const isTauri = '__TAURI__' in window || '__TAURI_INTERNALS__' in window || '__TAURI_IPC__' in window;
-
-      if (isTauri) {
-        iniciarSyncListener({
-          supabaseUrl: import.meta.env.PUBLIC_SUPABASE_URL ?? '',
-          supabaseKey: import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '',
-        }).catch(err => console.error('Error iniciando listener:', err));
-      }
+      // Intentar iniciar el listener de sincronización. 
+      // Si estamos en la Web, fallará silenciosamente, lo cual es el comportamiento deseado.
+      iniciarSyncListener({
+        supabaseUrl: import.meta.env.PUBLIC_SUPABASE_URL ?? '',
+        supabaseKey: import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '',
+      }).catch(() => {
+        // Ignorar el error: esto significa que estamos en el navegador web normal
+      });
     </script>
   </body>
 </html>
