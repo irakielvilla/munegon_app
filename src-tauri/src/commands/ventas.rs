@@ -548,3 +548,59 @@ pub fn verificar_pin(usuario_id: String, pin: String) -> Result<bool, String> {
         Err(e) => Err(e.to_string()),
     }
 }
+
+// ── Commands: Sincronización (Pull) ──────────────────────────
+
+#[derive(Deserialize)]
+pub struct PullPayload {
+    usuarios: Vec<serde_json::Value>,
+    productos: Vec<serde_json::Value>,
+}
+
+#[tauri::command]
+pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
+    let mut conn = open_db().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    // 1. Guardar Usuarios
+    for u in payload.usuarios {
+        let id = u["id"].as_str().unwrap_or("");
+        let nombre = u["nombre"].as_str().unwrap_or("");
+        let pin = u["pin"].as_str().unwrap_or("");
+        let rol = u["rol"].as_str().unwrap_or("");
+        let activo = u["activo"].as_bool().unwrap_or(true) as i32;
+
+        tx.execute(
+            "INSERT INTO Usuario (id, nombre, pin, rol, activo, creadoEn)
+             VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
+             ON CONFLICT(id) DO UPDATE SET 
+             nombre=excluded.nombre, pin=excluded.pin, rol=excluded.rol, activo=excluded.activo",
+            params![id, nombre, pin, rol, activo],
+        ).unwrap_or_default();
+    }
+
+    // 2. Guardar Productos
+    for p in payload.productos {
+        let id = p["id"].as_str().unwrap_or("");
+        let sku = p["sku"].as_str().unwrap_or("");
+        let nombre = p["nombre"].as_str().unwrap_or("");
+        let desc = p["descripcion"].as_str(); // Optional
+        let precio_usd = p["precioUSD"].as_str().unwrap_or("0");
+        let stock = p["stock"].as_i64().unwrap_or(0);
+        let stock_min = p["stockMinimo"].as_i64().unwrap_or(0);
+        let activo = p["activo"].as_bool().unwrap_or(true) as i32;
+
+        tx.execute(
+            "INSERT INTO Producto (id, sku, nombre, descripcion, precioUSD, stock, stockMinimo, activo, isSynced, creadoEn, actualizadoEn)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, datetime('now'), datetime('now'))
+             ON CONFLICT(id) DO UPDATE SET 
+             sku=excluded.sku, nombre=excluded.nombre, descripcion=excluded.descripcion,
+             precioUSD=excluded.precioUSD, stock=excluded.stock, stockMinimo=excluded.stockMinimo,
+             activo=excluded.activo, isSynced=1, actualizadoEn=datetime('now')",
+            params![id, sku, nombre, desc, precio_usd, stock, stock_min, activo],
+        ).unwrap_or_default();
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}

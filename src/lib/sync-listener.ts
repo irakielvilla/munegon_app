@@ -25,6 +25,10 @@ interface SyncResult {
   productoIds: string[];
   logIds: string[];
   error?: string;
+  pullData?: {
+    usuarios: any[];
+    productos: any[];
+  };
 }
 
 /**
@@ -77,6 +81,12 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
             productoIds: result.productoIds,
             logIds: result.logIds,
           });
+
+          // Guardar datos descargados (Pull)
+          if (result.pullData) {
+            await invoke('guardar_datos_pull', { payload: result.pullData });
+            console.log(`[Sync] 📥 Pull guardado localmente: ${result.pullData.usuarios.length} usuarios, ${result.pullData.productos.length} productos`);
+          }
 
           await emit('sync-completado', {
             timestamp: new Date().toISOString(),

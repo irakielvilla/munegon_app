@@ -35,6 +35,10 @@ interface SyncResult {
   productoIds: string[];
   logIds: string[];
   error?: string;
+  pullData?: {
+    usuarios: any[];
+    productos: any[];
+  };
 }
 
 // ── Entry point del worker ────────────────────────────────────
@@ -92,7 +96,24 @@ async function ejecutarSync(
       totalSynced += logs.length;
     }
 
-    return { ok: true, synced: totalSynced, ventaIds, productoIds, logIds };
+    // ── 4. Pull de Data Web (Usuarios y Productos) ────────────
+    const { data: pullUsuarios, error: uErr } = await supabase.from('Usuario').select('*');
+    if (uErr) console.error('[SyncWorker] Error pull usuarios:', uErr.message);
+
+    const { data: pullProductos, error: pErr } = await supabase.from('Producto').select('*');
+    if (pErr) console.error('[SyncWorker] Error pull productos:', pErr.message);
+
+    return { 
+      ok: true, 
+      synced: totalSynced, 
+      ventaIds, 
+      productoIds, 
+      logIds,
+      pullData: {
+        usuarios: pullUsuarios || [],
+        productos: pullProductos || []
+      }
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[SyncWorker] Error:', message);

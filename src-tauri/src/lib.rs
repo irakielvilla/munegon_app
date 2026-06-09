@@ -47,6 +47,7 @@ pub fn run() {
             commands::ventas::obtener_productos_pendientes,
             commands::ventas::obtener_logs_pendientes,
             commands::ventas::marcar_sincronizados,
+            commands::ventas::guardar_datos_pull,
             // Autenticación
             commands::ventas::verificar_pin,
             // Reportes PDF
