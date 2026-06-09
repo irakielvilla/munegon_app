@@ -104,13 +104,20 @@ export const api = {
 
   crear_producto: async (payload: any): Promise<void> => {
     if (isTauri()) return invokeTauri<void>('crear_producto', payload);
-    const { error } = await supabase.from('Producto').insert([{ ...payload, isSynced: true }]);
+    const supabasePayload = { ...payload, precioUSD: payload.precioUsd, isSynced: true };
+    delete supabasePayload.precioUsd;
+    const { error } = await supabase.from('Producto').insert([supabasePayload]);
     if (error) throw new Error(error.message);
   },
 
   actualizar_producto: async (payload: any): Promise<void> => {
     if (isTauri()) return invokeTauri<void>('actualizar_producto', payload);
-    const { error } = await supabase.from('Producto').update(payload).eq('id', payload.id);
+    const supabasePayload = { ...payload };
+    if (supabasePayload.precioUsd !== undefined) {
+      supabasePayload.precioUSD = supabasePayload.precioUsd;
+      delete supabasePayload.precioUsd;
+    }
+    const { error } = await supabase.from('Producto').update(supabasePayload).eq('id', payload.id);
     if (error) throw new Error(error.message);
   },
 
