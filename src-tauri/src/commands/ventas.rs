@@ -344,6 +344,8 @@ pub fn listar_cortes_caja() -> Result<Vec<CorteCajaInfo>, String> {
 #[tauri::command]
 pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
     let conn = open_db().map_err(|e| e.to_string())?;
+    
+    // Primero, obtener las ventas
     let mut stmt = conn
         .prepare(
             "SELECT id, usuarioId, subtotal, impuesto, total, formaPago,
@@ -354,23 +356,67 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
 
     let rows = stmt
         .query_map([], |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "usuarioId": row.get::<_, String>(1)?,
-                "subtotal": row.get::<_, String>(2)?,
-                "impuesto": row.get::<_, String>(3)?,
-                "total": row.get::<_, String>(4)?,
-                "formaPago": row.get::<_, String>(5)?,
-                "moneda": row.get::<_, String>(6)?,
-                "referenciaPago": row.get::<_, Option<String>>(7)?,
-                "tasaCambio": row.get::<_, Option<String>>(8)?,
-                "creadoEn": row.get::<_, String>(9)?,
-                "isSynced": false,
-            }))
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, String>(9)?,
+            ))
         })
         .map_err(|e| e.to_string())?;
 
-    rows.map(|r| r.map_err(|e| e.to_string())).collect()
+    let sales_list: Vec<_> = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    
+    // Liberar la consulta de ventas para poder consultar las líneas con la misma conexión
+    drop(stmt);
+
+    let mut ventas_json = Vec::new();
+    for (id, usuario_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio, creado_en) in sales_list {
+        // Consultar las líneas de esta venta
+        let mut lineas_stmt = conn.prepare(
+            "SELECT id, ventaId, productoId, cantidad, precioUnit, subtotal 
+             FROM LineaVenta WHERE ventaId = ?1"
+        ).map_err(|e| e.to_string())?;
+        
+        let lineas_rows = lineas_stmt.query_map(params![id], |linea_row| {
+            Ok(serde_json::json!({
+                "id": linea_row.get::<_, String>(0)?,
+                "ventaId": linea_row.get::<_, String>(1)?,
+                "productoId": linea_row.get::<_, String>(2)?,
+                "cantidad": linea_row.get::<_, i64>(3)?,
+                "precioUnit": linea_row.get::<_, String>(4)?,
+                "subtotal": linea_row.get::<_, String>(5)?,
+            }))
+        }).map_err(|e| e.to_string())?;
+        
+        let mut lineas = Vec::new();
+        for lr in lineas_rows {
+            lineas.push(lr.map_err(|e| e.to_string())?);
+        }
+
+        ventas_json.push(serde_json::json!({
+            "id": id,
+            "usuarioId": usuario_id,
+            "subtotal": subtotal,
+            "impuesto": impuesto,
+            "total": total,
+            "formaPago": forma_pago,
+            "moneda": moneda,
+            "referenciaPago": referencia_pago,
+            "tasaCambio": tasa_cambio,
+            "creadoEn": creado_en,
+            "isSynced": false,
+            "lineas": lineas
+        }));
+    }
+
+    Ok(ventas_json)
 }
 
 #[tauri::command]

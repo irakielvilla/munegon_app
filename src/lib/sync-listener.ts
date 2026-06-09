@@ -39,10 +39,30 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
       const productoIds: string[] = [];
       const logIds: string[] = [];
 
-      // 1. Ventas
+      // 1. Ventas y sus Lineas
       if (ventas.length > 0) {
-        const { error } = await supabase.from('Venta').upsert(ventas, { onConflict: 'id' });
-        if (error) throw new Error(`Ventas: ${error.message}`);
+        // Separamos las relaciones nested (lineas) de los objetos de venta principales
+        const ventasData = ventas.map((v) => {
+          const { lineas, ...vRest } = v;
+          return {
+            ...vRest,
+            isSynced: true
+          };
+        });
+
+        // Aplanamos todas las lineas de todas las ventas para subirlas
+        const lineasData = ventas.flatMap((v) => (v['lineas'] as any[] || []));
+
+        // Subir primero las ventas (por restricciones de llave foránea en LineaVenta)
+        const { error: vErr } = await supabase.from('Venta').upsert(ventasData, { onConflict: 'id' });
+        if (vErr) throw new Error(`Ventas: ${vErr.message}`);
+
+        // Subir las líneas de venta
+        if (lineasData.length > 0) {
+          const { error: lErr } = await supabase.from('LineaVenta').upsert(lineasData, { onConflict: 'id' });
+          if (lErr) throw new Error(`Lineas de venta: ${lErr.message}`);
+        }
+
         ventaIds.push(...ventas.map((v) => v['id'] as string));
         totalSynced += ventas.length;
       }

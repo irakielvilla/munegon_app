@@ -156,9 +156,12 @@ export const api = {
     // Insertar Lineas
     if (lineas && lineas.length > 0) {
       const lineasInsert = lineas.map((l: any) => ({
-        ...l,
         id: crypto.randomUUID(),
-        ventaId: ventaId
+        ventaId: ventaId,
+        productoId: l.producto_id || l.productoId,
+        cantidad: l.cantidad,
+        precioUnit: l.precio_unit || l.precioUnit,
+        subtotal: l.subtotal
       }));
       const { error: lErr } = await supabase.from('LineaVenta').insert(lineasInsert);
       if (lErr) throw new Error(lErr.message);
