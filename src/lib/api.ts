@@ -250,7 +250,7 @@ export const api = {
       tipo: 'Z',
       usuarioId: payload.usuarioId,
       totalCalculado: total_bs,
-      totalDeclarado: payload.efectivoBsCaja,
+      totalDeclarado: payload.totalDeclarado,
       diferencia: '0.00',
       isSynced: true
     }]);

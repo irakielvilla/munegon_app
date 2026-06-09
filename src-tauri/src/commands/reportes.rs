@@ -200,13 +200,15 @@ pub fn generar_pdf_corte(corte_id: String) -> Result<String, String> {
 
 /// Genera el PDF del Corte Z (cierre de día).
 /// - Calcula los totales del día por forma de pago
+/// - Compara con lo declarado manualmente (total_declarado JSON)
 /// - Registra el Corte Z en CorteCaja
 /// - Asigna corteCajaId a todas las ventas del día (cierre)
 /// - Devuelve la ruta del PDF generado
 #[tauri::command]
 pub fn generar_pdf_corte_z(
     usuario_id: String,
-    efectivo_bs_caja: String,   // efectivo Bs que queda en caja (inicio del día siguiente)
+    total_declarado: String,
+    tasa_cambio: String,
 ) -> Result<String, String> {
     let conn = open_db().map_err(|e| e.to_string())?;
 
@@ -219,7 +221,7 @@ pub fn generar_pdf_corte_z(
         )
         .map_err(|e| format!("Usuario no encontrado: {e}"))?;
 
-    // ── 2. Fecha y hora actuales (desde SQLite localtime) ─────
+    // ── 2. Fecha y hora actuales ─────────────────────────────
     let fecha_str: String = conn
         .query_row(
             "SELECT strftime('%d/%m/%Y', 'now', 'localtime')",
@@ -236,8 +238,7 @@ pub fn generar_pdf_corte_z(
         )
         .unwrap_or_else(|_| "—".to_string());
 
-    // ── 3. Totales del día por forma de pago ─────────────────
-    // Bs: total(USD) × tasaCambio (snapshot por fila)
+    // ── 3. Totales del día (SISTEMA) ─────────────────────────
     let consulta_bs = |forma: &str| -> f64 {
         conn.query_row(
             "SELECT COALESCE(
@@ -253,13 +254,12 @@ pub fn generar_pdf_corte_z(
         .unwrap_or(0.0)
     };
 
-    let bs_efectivo  = consulta_bs("BS_EFECTIVO");
-    let bs_debito    = consulta_bs("BS_DEBITO");
-    let bs_pago_movil = consulta_bs("BS_PAGO_MOVIL");
-    let total_bs     = bs_efectivo + bs_debito + bs_pago_movil;
+    let sys_bs_efectivo  = consulta_bs("BS_EFECTIVO");
+    let sys_bs_debito    = consulta_bs("BS_DEBITO");
+    let sys_bs_pago_movil = consulta_bs("BS_PAGO_MOVIL");
+    let sys_total_bs     = sys_bs_efectivo + sys_bs_debito + sys_bs_pago_movil;
 
-    // USD: suma directa
-    let usd_efectivo: f64 = conn
+    let sys_usd_efectivo: f64 = conn
         .query_row(
             "SELECT COALESCE(SUM(CAST(total AS REAL)), 0.0)
              FROM Venta
@@ -270,7 +270,6 @@ pub fn generar_pdf_corte_z(
         )
         .unwrap_or(0.0);
 
-    // Número de transacciones
     let num_ventas: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM Venta WHERE date(creadoEn) = date('now', 'localtime')",
@@ -279,24 +278,38 @@ pub fn generar_pdf_corte_z(
         )
         .unwrap_or(0);
 
-    let efectivo_num = efectivo_bs_caja.parse::<f64>().unwrap_or(0.0);
+    // ── 4. Totales Declarados (FÍSICO) ───────────────────────
+    let decl: serde_json::Value = serde_json::from_str(&total_declarado)
+        .unwrap_or_else(|_| serde_json::json!({
+            "bsEfectivo": "0", "bsDebito": "0", "bsPagoMovil": "0", "usdEfectivo": "0", "totalUsdEquiv": "0"
+        }));
 
-    // ── 4. Registrar Corte Z en la BD ────────────────────────
+    let man_bs_efectivo = decl["bsEfectivo"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let man_bs_debito = decl["bsDebito"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let man_bs_pago_movil = decl["bsPagoMovil"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let man_usd_efectivo = decl["usdEfectivo"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let man_total_usd_equiv = decl["totalUsdEquiv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+
+    let tasa_num = tasa_cambio.parse::<f64>().unwrap_or(1.0);
+    let sys_total_usd_equiv = (sys_total_bs / tasa_num) + sys_usd_efectivo;
+    let diferencia_usd = man_total_usd_equiv - sys_total_usd_equiv;
+
+    // ── 5. Registrar Corte Z en BD ───────────────────────────
     let corte_id = Uuid::new_v4().to_string();
 
     conn.execute(
         "INSERT INTO CorteCaja (id, tipo, usuarioId, totalCalculado, totalDeclarado, diferencia, isSynced, creadoEn)
-         VALUES (?1, 'Z', ?2, ?3, ?4, '0.00', 0, datetime('now', 'localtime'))",
+         VALUES (?1, 'Z', ?2, ?3, ?4, ?5, 0, datetime('now', 'localtime'))",
         params![
             corte_id,
             usuario_id,
-            format!("{:.2}", total_bs),
-            format!("{:.2}", efectivo_num),
+            format!("{:.2}", sys_total_usd_equiv),
+            total_declarado,
+            format!("{:.2}", diferencia_usd),
         ],
     )
     .map_err(|e| e.to_string())?;
 
-    // ── 5. Cerrar el día: asignar corteCajaId a ventas del día
     conn.execute(
         "UPDATE Venta SET corteCajaId = ?1
          WHERE date(creadoEn) = date('now', 'localtime')
@@ -313,12 +326,9 @@ pub fn generar_pdf_corte_z(
     let negrita  = doc.add_builtin_font(BuiltinFont::HelveticaBold).map_err(|e| e.to_string())?;
     let regular  = doc.add_builtin_font(BuiltinFont::Helvetica).map_err(|e| e.to_string())?;
 
-    // Helpers de formato
-    let fmt_bs  = |n: f64| format!("{:.2}", n);
-    let fmt_usd = |n: f64| format!("{:.2}", n);
-    let sep     = "________________________________________________";
+    let sep = "________________________________________________";
 
-    // ── Encabezado ──
+    // Encabezado
     layer.use_text("MUNEGON POS",                  22.0, Mm(20.0), Mm(277.0), &negrita);
     layer.use_text("CIERRE DE DIA — CORTE Z",      14.0, Mm(20.0), Mm(268.0), &negrita);
     layer.use_text(sep,                              8.0, Mm(20.0), Mm(263.0), &regular);
@@ -329,73 +339,75 @@ pub fn generar_pdf_corte_z(
     layer.use_text(&format!("Transacciones: {}", num_ventas),    10.0, Mm(20.0), Mm(235.0), &regular);
     layer.use_text(sep,                              8.0, Mm(20.0), Mm(230.0), &regular);
 
-    // ── Título de sección: Ventas por método de pago ──
-    layer.use_text("VENTAS DEL DIA POR METODO DE PAGO",  12.0, Mm(20.0), Mm(223.0), &negrita);
+    // Título de tabla
+    layer.use_text("VENTAS DEL DIA VS CONTEO FISICO",  12.0, Mm(20.0), Mm(223.0), &negrita);
     layer.use_text(sep,                                    8.0, Mm(20.0), Mm(218.0), &regular);
 
-    // ── Encabezados de tabla ──
-    let cx = 20.0_f32;   // columna 1: método
-    let cy = 120.0_f32;  // columna 2: monto
-    layer.use_text("Metodo de Pago",   9.0, Mm(cx),  Mm(212.0), &negrita);
-    layer.use_text("Total del Sistema",9.0, Mm(cy),  Mm(212.0), &negrita);
+    // Encabezados de tabla
+    let cx = 20.0_f32;   // Metodo
+    let cy = 80.0_f32;   // Sistema
+    let cz = 130.0_f32;  // Fisico
+    let cw = 175.0_f32;  // Dif
+
+    layer.use_text("Metodo",   9.0, Mm(cx),  Mm(212.0), &negrita);
+    layer.use_text("Sistema",  9.0, Mm(cy),  Mm(212.0), &negrita);
+    layer.use_text("Fisico",   9.0, Mm(cz),  Mm(212.0), &negrita);
+    layer.use_text("Dif.",     9.0, Mm(cw),  Mm(212.0), &negrita);
     layer.use_text(sep,                8.0, Mm(20.0), Mm(208.0), &regular);
 
-    // ── Filas: métodos Bs ──
+    // Filas
     let mut y = 202.0_f32;
     let row = 9.0_f32;
 
-    layer.use_text("Efectivo Bs",   10.0, Mm(cx), Mm(y), &regular);
-    layer.use_text(&format!("Bs {}", fmt_bs(bs_efectivo)),   10.0, Mm(cy), Mm(y), &negrita);
-    y -= row;
+    let print_row = |metodo: &str, sys: f64, man: f64, dif: f64, is_usd: bool, y_val: &mut f32| {
+        layer.use_text(metodo, 10.0, Mm(cx), Mm(*y_val), &regular);
+        
+        let prefix = if is_usd { "$" } else { "Bs" };
+        layer.use_text(format!("{} {:.2}", prefix, sys), 10.0, Mm(cy), Mm(*y_val), &regular);
+        layer.use_text(format!("{} {:.2}", prefix, man), 10.0, Mm(cz), Mm(*y_val), &negrita);
+        
+        let sign = if dif >= 0.0 { "+" } else { "" };
+        layer.use_text(format!("{}{:.2}", sign, dif), 10.0, Mm(cw), Mm(*y_val), &regular);
+        
+        *y_val -= row;
+    };
 
-    layer.use_text("Debito Bs",     10.0, Mm(cx), Mm(y), &regular);
-    layer.use_text(&format!("Bs {}", fmt_bs(bs_debito)),     10.0, Mm(cy), Mm(y), &negrita);
-    y -= row;
-
-    layer.use_text("Pago Movil Bs", 10.0, Mm(cx), Mm(y), &regular);
-    layer.use_text(&format!("Bs {}", fmt_bs(bs_pago_movil)), 10.0, Mm(cy), Mm(y), &negrita);
+    print_row("Efectivo Bs", sys_bs_efectivo, man_bs_efectivo, man_bs_efectivo - sys_bs_efectivo, false, &mut y);
+    print_row("Debito Bs", sys_bs_debito, man_bs_debito, man_bs_debito - sys_bs_debito, false, &mut y);
+    print_row("Pago Movil Bs", sys_bs_pago_movil, man_bs_pago_movil, man_bs_pago_movil - sys_bs_pago_movil, false, &mut y);
+    
     y -= 5.0;
-
-    // ── Subtotal Bs ──
     layer.use_text(sep, 8.0, Mm(20.0), Mm(y), &regular);
     y -= 8.0;
-    layer.use_text("SUBTOTAL Bs",   11.0, Mm(cx), Mm(y), &negrita);
-    layer.use_text(&format!("Bs {}", fmt_bs(total_bs)),      11.0, Mm(cy), Mm(y), &negrita);
-    y -= 5.0;
 
-    // ── Separador antes del USD ──
+    print_row("Efectivo $", sys_usd_efectivo, man_usd_efectivo, man_usd_efectivo - sys_usd_efectivo, true, &mut y);
+
+    y -= 5.0;
     layer.use_text(sep, 8.0, Mm(20.0), Mm(y), &regular);
-    y -= 8.0;
+    y -= 12.0;
 
-    // ── Fila USD ──
-    layer.use_text("Efectivo $ (USD)", 10.0, Mm(cx), Mm(y), &regular);
-    layer.use_text(&format!("$ {}", fmt_usd(usd_efectivo)),  10.0, Mm(cy), Mm(y), &negrita);
-    y -= 5.0;
+    // Resumen Global USD Equivalente
+    layer.use_text("DIFERENCIA GLOBAL (EQUIV. USD):", 12.0, Mm(cx), Mm(y), &negrita);
+    y -= 10.0;
+    let dif_sign = if diferencia_usd >= 0.0 { "+" } else { "" };
+    layer.use_text(&format!("   $ {}{:.2} USD", dif_sign, diferencia_usd), 14.0, Mm(cx + 5.0), Mm(y), &negrita);
+    y -= 8.0;
 
     layer.use_text(sep, 8.0, Mm(20.0), Mm(y), &regular);
     y -= 12.0;
 
-    // ── Ventas totales brutas ──
-    layer.use_text("VENTAS TOTALES BRUTAS DEL DIA:", 12.0, Mm(cx), Mm(y), &negrita);
+    // Efectivo en caja para mañana (Solo Efectivos físicos)
+    layer.use_text("EFECTIVO FÍSICO EN CAJA (inicio proximo dia):", 11.0, Mm(cx), Mm(y), &negrita);
     y -= 10.0;
-    layer.use_text(&format!("   Bs {}", fmt_bs(total_bs)),   12.0, Mm(cx + 5.0), Mm(y), &negrita);
+    layer.use_text(&format!("   Bs {:.2}", man_bs_efectivo), 12.0, Mm(cx + 5.0), Mm(y), &negrita);
     y -= 8.0;
-    layer.use_text(&format!("   $ {}  USD", fmt_usd(usd_efectivo)), 12.0, Mm(cx + 5.0), Mm(y), &negrita);
-    y -= 6.0;
-
-    layer.use_text(sep, 8.0, Mm(20.0), Mm(y), &regular);
-    y -= 12.0;
-
-    // ── Efectivo en caja (inicio del día siguiente) ──
-    layer.use_text("EFECTIVO Bs EN CAJA (inicio proximo dia):", 11.0, Mm(cx), Mm(y), &negrita);
-    y -= 10.0;
-    layer.use_text(&format!("   Bs {}", fmt_bs(efectivo_num)), 14.0, Mm(cx + 5.0), Mm(y), &negrita);
+    layer.use_text(&format!("   $  {:.2} USD", man_usd_efectivo), 12.0, Mm(cx + 5.0), Mm(y), &negrita);
     y -= 8.0;
 
     layer.use_text(sep, 8.0, Mm(20.0), Mm(y), &regular);
     y -= 10.0;
 
-    // ── Pie de página ──
+    // Pie de página
     layer.use_text("Documento generado por Munegon POS  |  Solo para uso interno", 7.5, Mm(cx), Mm(y), &regular);
 
     // ── 7. Guardar PDF ────────────────────────────────────────

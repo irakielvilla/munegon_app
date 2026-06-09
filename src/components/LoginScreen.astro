@@ -112,7 +112,7 @@
     <footer class="login-footer">
       <div class="fondopie">
         <p>
-          v0.1.0 &nbsp;·&nbsp; <span id="sync-status" class="sync-indicator"
+          v0.1.5 &nbsp;·&nbsp; <span id="sync-status" class="sync-indicator"
             >⚫ Sin conexión</span
           >
         </p>
@@ -662,10 +662,7 @@
     confirmBtn.textContent = "...";
 
     try {
-      const ok = await api.verificar_pin(
-        usuarioSeleccionado.id,
-        pinActual,
-      );
+      const ok = await api.verificar_pin(usuarioSeleccionado.id, pinActual);
 
       if (ok) {
         // Guardar sesión usando la utilidad centralizada
@@ -676,7 +673,7 @@
         });
 
         // Redirigir según rol (siempre a /caja como punto de entrada)
-        window.location.href = '/caja';
+        window.location.href = "/caja";
       } else {
         mostrarErrorPin();
       }

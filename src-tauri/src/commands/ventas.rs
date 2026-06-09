@@ -2,7 +2,7 @@
 // MUÑEGON POS — Comandos Tauri: Ventas & Configuración
 // ══════════════════════════════════════════════════════════════
 
-use rusqlite::params;
+use rusqlite::{params, params_from_iter};
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
 use uuid::Uuid;
@@ -562,9 +562,15 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
     let mut conn = open_db().map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
+    let mut pulled_user_ids = Vec::new();
+    let mut pulled_product_ids = Vec::new();
+
     // 1. Guardar Usuarios
     for u in payload.usuarios {
         let id = u["id"].as_str().unwrap_or("");
+        if !id.is_empty() {
+            pulled_user_ids.push(id.to_string());
+        }
         let nombre = u["nombre"].as_str().unwrap_or("");
         let pin = u["pin"].as_str().unwrap_or("");
         let rol = u["rol"].as_str().unwrap_or("");
@@ -582,6 +588,9 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
     // 2. Guardar Productos
     for p in payload.productos {
         let id = p["id"].as_str().unwrap_or("");
+        if !id.is_empty() {
+            pulled_product_ids.push(id.to_string());
+        }
         let sku = p["sku"].as_str().unwrap_or("");
         let nombre = p["nombre"].as_str().unwrap_or("");
         let desc = p["descripcion"].as_str(); // Optional
@@ -599,6 +608,46 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
              activo=excluded.activo, isSynced=1, actualizadoEn=datetime('now')",
             params![id, sku, nombre, desc, precio_usd, stock, stock_min, activo],
         ).unwrap_or_default();
+    }
+
+    // 3. Limpiar / desactivar usuarios eliminados en Supabase
+    if !pulled_user_ids.is_empty() {
+        let placeholders = pulled_user_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        let delete_sql = format!(
+            "DELETE FROM Usuario 
+             WHERE id NOT IN ({}) 
+             AND id NOT IN (SELECT DISTINCT usuarioId FROM Venta)
+             AND id NOT IN (SELECT DISTINCT usuarioId FROM LogCambio)
+             AND id NOT IN (SELECT DISTINCT usuarioId FROM CorteCaja)",
+            placeholders
+        );
+        let params: Vec<&str> = pulled_user_ids.iter().map(|s| s.as_str()).collect();
+        tx.execute(&delete_sql, params_from_iter(params.iter())).unwrap_or_default();
+
+        let deactivate_sql = format!(
+            "UPDATE Usuario SET activo = 0 WHERE id NOT IN ({})",
+            placeholders
+        );
+        tx.execute(&deactivate_sql, params_from_iter(params.iter())).unwrap_or_default();
+    }
+
+    // 4. Limpiar / desactivar productos eliminados en Supabase
+    if !pulled_product_ids.is_empty() {
+        let placeholders = pulled_product_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        let delete_sql = format!(
+            "DELETE FROM Producto 
+             WHERE id NOT IN ({}) 
+             AND id NOT IN (SELECT DISTINCT productoId FROM LineaVenta)",
+            placeholders
+        );
+        let params: Vec<&str> = pulled_product_ids.iter().map(|s| s.as_str()).collect();
+        tx.execute(&delete_sql, params_from_iter(params.iter())).unwrap_or_default();
+
+        let deactivate_sql = format!(
+            "UPDATE Producto SET activo = 0 WHERE id NOT IN ({})",
+            placeholders
+        );
+        tx.execute(&deactivate_sql, params_from_iter(params.iter())).unwrap_or_default();
     }
 
     tx.commit().map_err(|e| e.to_string())?;

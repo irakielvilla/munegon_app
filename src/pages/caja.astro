@@ -1,29 +1,18 @@
 ---
 // Muñegon POS — Módulo de Caja (POS)
 // Acceso: ADMIN + CAJERO
+import BaseLayout from '../layouts/BaseLayout.astro';
 import Sidebar from '../components/Sidebar';
 import TerminalCaja from '../components/pos/TerminalCaja';
 import '../styles/sidebar.css';
 import '../styles/caja.css';
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Caja — Muñegon POS</title>
-    <meta name="description" content="Terminal de punto de venta Muñegon POS" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <div class="app-layout">
-      <Sidebar client:only="preact" />
-      <div class="app-content">
-        <TerminalCaja client:only="preact" />
-      </div>
+<BaseLayout title="Caja">
+  <div class="app-layout">
+    <Sidebar client:only="preact" />
+    <div class="app-content">
+      <TerminalCaja client:only="preact" />
     </div>
-  </body>
-</html>
+  </div>
+</BaseLayout>

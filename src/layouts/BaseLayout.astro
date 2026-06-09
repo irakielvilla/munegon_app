@@ -37,12 +37,11 @@ const { title = 'Muñegon POS' } = Astro.props;
       import { iniciarSyncListener } from '../lib/sync-listener';
 
       // Intentar iniciar el listener de sincronización. 
-      // Si estamos en la Web, fallará silenciosamente, lo cual es el comportamiento deseado.
       iniciarSyncListener({
         supabaseUrl: import.meta.env.PUBLIC_SUPABASE_URL ?? '',
         supabaseKey: import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '',
-      }).catch(() => {
-        // Ignorar el error: esto significa que estamos en el navegador web normal
+      }).catch((err) => {
+        console.error('[BaseLayout] Error al iniciar el listener de sincronización:', err);
       });
     </script>
   </body>

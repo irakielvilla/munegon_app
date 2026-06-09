@@ -20,9 +20,9 @@ export interface SyncConfig {
 }
 
 export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
-  await listen('ejecutar-sincronizacion', async () => {
+  const hacerSync = async () => {
     try {
-      console.log('[Sync] 🔔 Evento recibido de Rust. Cargando registros pendientes...');
+      console.log('[Sync] 🔔 Iniciando sincronización...');
 
       const [ventas, productos, logs] = await Promise.all([
         invoke<Record<string, unknown>[]>('obtener_ventas_pendientes'),
@@ -100,7 +100,16 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
         error: err.message,
       });
     }
-  });
+  };
 
-  console.log('[Sync] 👂 Listener activo — esperando señal de Rust.');
+  // Truco: exponer a window para lanzarlo manualmente
+  (window as any).forzarSincronizacion = hacerSync;
+
+  try {
+    // Escuchar el evento que manda Rust
+    await listen('ejecutar-sincronizacion', hacerSync);
+    console.log('[Sync] 👂 Listener activo — esperando señal de Rust.');
+  } catch (err) {
+    console.warn('[Sync] No se pudo registrar el listener de Tauri (¿ejecutando en navegador web?):', err);
+  }
 }
