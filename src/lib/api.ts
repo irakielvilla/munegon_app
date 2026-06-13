@@ -270,7 +270,7 @@ export const api = {
     
     if (error) throw new Error(error.message);
     
-    return data.map((d: any) => ({
+    const mapped = data.map((d: any) => ({
       id: d.id,
       tipo: d.tipo,
       usuarioId: d.usuarioId,
@@ -280,6 +280,8 @@ export const api = {
       diferencia: d.diferencia,
       creadoEn: d.creadoEn
     }));
+
+    return mapped.sort((a, b) => new Date(b.creadoEn).getTime() - new Date(a.creadoEn).getTime());
   },
 
   generar_pdf_corte: async (payload: { corteId: string }): Promise<string> => {
