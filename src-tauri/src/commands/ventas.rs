@@ -271,9 +271,9 @@ pub fn crear_venta(
         )
         .map_err(|e| e.to_string())?;
 
-        // Descontar stock
+        // Descontar stock (sin marcar isSynced=0 para no pisar stock de Supabase al sincronizar)
         conn.execute(
-            "UPDATE Producto SET stock = stock - ?1, isSynced = 0, actualizadoEn = datetime('now') WHERE id = ?2",
+            "UPDATE Producto SET stock = stock - ?1, actualizadoEn = datetime('now') WHERE id = ?2",
             params![linea.cantidad, linea.producto_id],
         )
         .map_err(|e| e.to_string())?;
