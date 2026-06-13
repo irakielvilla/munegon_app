@@ -1,0 +1,20 @@
+---
+// Muñegon POS — Módulo de Administración (En Mantenimiento)
+// Acceso: solo ADMIN
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Sidebar from '../components/Sidebar';
+import AuthGuard from '../components/AuthGuard';
+import Mantenimiento from '../components/Mantenimiento';
+import '../styles/sidebar.css';
+---
+
+<BaseLayout title="Administración">
+  <div class="app-layout">
+    <Sidebar client:only="preact" />
+    <div class="app-content">
+      <AuthGuard rol="ADMIN" client:only="preact">
+        <Mantenimiento client:only="preact" modulo="Administración" />
+      </AuthGuard>
+    </div>
+  </div>
+</BaseLayout>

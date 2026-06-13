@@ -1,0 +1,17 @@
+---
+// Muñegon POS — Módulo de Comandas (En Mantenimiento)
+// Acceso: ADMIN + CAJERO
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Sidebar from '../components/Sidebar';
+import Mantenimiento from '../components/Mantenimiento';
+import '../styles/sidebar.css';
+---
+
+<BaseLayout title="Comandas">
+  <div class="app-layout">
+    <Sidebar client:only="preact" />
+    <div class="app-content">
+      <Mantenimiento client:only="preact" modulo="Comandas" />
+    </div>
+  </div>
+</BaseLayout>

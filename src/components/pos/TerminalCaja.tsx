@@ -244,10 +244,14 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
             <input
               id="referencia-input"
               type="text"
-              placeholder="Últimos 8 dígitos"
+              placeholder="Últimos 4 dígitos"
               value={referencia}
-              onInput={(e) => setReferencia((e.target as HTMLInputElement).value)}
-              maxLength={20}
+              onInput={(e) => {
+                const rawVal = (e.target as HTMLInputElement).value;
+                const numericVal = rawVal.replace(/\D/g, '').slice(0, 4);
+                setReferencia(numericVal);
+              }}
+              maxLength={4}
             />
           </div>
         )}

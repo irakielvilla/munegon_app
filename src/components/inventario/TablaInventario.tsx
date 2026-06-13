@@ -235,7 +235,7 @@ export default function TablaInventario() {
               <div class="form-row">
                 <div class="form-group">
                   <label for="f-sku">SKU *</label>
-                  <input id="f-sku" type="text" value={form.sku} onInput={(e) => setField('sku', (e.target as HTMLInputElement).value)} placeholder="EJ-001" />
+                  <input id="f-sku" type="text" style={{ textTransform: 'uppercase' }} value={form.sku} onInput={(e) => setField('sku', (e.target as HTMLInputElement).value.toUpperCase())} placeholder="EJ-001" />
                 </div>
                 <div class="form-group">
                   <label for="f-precio">Precio USD *</label>
@@ -244,11 +244,11 @@ export default function TablaInventario() {
               </div>
               <div class="form-group">
                 <label for="f-nombre">Nombre *</label>
-                <input id="f-nombre" type="text" value={form.nombre} onInput={(e) => setField('nombre', (e.target as HTMLInputElement).value)} placeholder="Nombre del producto" />
+                <input id="f-nombre" type="text" style={{ textTransform: 'uppercase' }} value={form.nombre} onInput={(e) => setField('nombre', (e.target as HTMLInputElement).value.toUpperCase())} placeholder="Nombre del producto" />
               </div>
               <div class="form-group">
                 <label for="f-desc">Descripción</label>
-                <input id="f-desc" type="text" value={form.descripcion ?? ''} onInput={(e) => setField('descripcion', (e.target as HTMLInputElement).value)} placeholder="Opcional" />
+                <input id="f-desc" type="text" style={{ textTransform: 'uppercase' }} value={form.descripcion ?? ''} onInput={(e) => setField('descripcion', (e.target as HTMLInputElement).value.toUpperCase())} placeholder="Opcional" />
               </div>
               <div class="form-row">
                 <div class="form-group">
