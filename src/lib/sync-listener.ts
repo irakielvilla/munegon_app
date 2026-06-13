@@ -41,7 +41,24 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
       const logIds: string[] = [];
       const corteIds: string[] = [];
 
-      // 1. Ventas y sus Lineas
+      // 1. Productos (Entidad independiente)
+      if (productos.length > 0) {
+        const { error } = await supabase.from('Producto').upsert(productos, { onConflict: 'id' });
+        if (error) throw new Error(`Productos: ${error.message}`);
+        productoIds.push(...productos.map((p) => p['id'] as string));
+        totalSynced += productos.length;
+      }
+
+      // 2. Cortes de Caja (Ventas dependen de él)
+      if (cortes.length > 0) {
+        const cortesData = cortes.map((c) => ({ ...c, isSynced: true }));
+        const { error } = await supabase.from('CorteCaja').upsert(cortesData, { onConflict: 'id' });
+        if (error) throw new Error(`Cortes de Caja: ${error.message}`);
+        corteIds.push(...cortes.map((c) => c['id'] as string));
+        totalSynced += cortes.length;
+      }
+
+      // 3. Ventas y sus Lineas (Dependen de Producto y CorteCaja)
       if (ventas.length > 0) {
         // Separamos las relaciones nested (lineas) de los objetos de venta principales
         const ventasData = ventas.map((v) => {
@@ -69,29 +86,12 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
         totalSynced += ventas.length;
       }
 
-      // 2. Productos
-      if (productos.length > 0) {
-        const { error } = await supabase.from('Producto').upsert(productos, { onConflict: 'id' });
-        if (error) throw new Error(`Productos: ${error.message}`);
-        productoIds.push(...productos.map((p) => p['id'] as string));
-        totalSynced += productos.length;
-      }
-
-      // 3. Logs
+      // 4. Logs (Dependen de todo lo anterior y de Usuario)
       if (logs.length > 0) {
         const { error } = await supabase.from('LogCambio').upsert(logs, { onConflict: 'id' });
         if (error) throw new Error(`Logs: ${error.message}`);
         logIds.push(...logs.map((l) => l['id'] as string));
         totalSynced += logs.length;
-      }
-
-      // 4. Cortes
-      if (cortes.length > 0) {
-        const cortesData = cortes.map((c) => ({ ...c, isSynced: true }));
-        const { error } = await supabase.from('CorteCaja').upsert(cortesData, { onConflict: 'id' });
-        if (error) throw new Error(`Cortes de Caja: ${error.message}`);
-        corteIds.push(...cortes.map((c) => c['id'] as string));
-        totalSynced += cortes.length;
       }
 
       // 5. Pull

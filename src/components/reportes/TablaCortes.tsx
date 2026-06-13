@@ -5,7 +5,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from 'preact/hooks';
-import { api, type ResumenDia, type ConfigApp } from '../../lib/api';
+import { api, parseLocalDate, type ResumenDia, type ConfigApp } from '../../lib/api';
 import { requireAuth, getSession } from '@lib/auth';
 
 // ── Tipos ─────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ function ModalCorteZ({ onConfirmar, onCerrar, generando }: ModalCorteZProps) {
   const [mostrarPopup, setMostrarPopup] = useState(false);
 
   useEffect(() => {
-    api.resumen_ventas_dia()
+    api.resumen_ventas_dia(false)
       .then((data) => { setResumen(data); setCargando(false); })
       .catch(() => { setErrorCarga(true); setCargando(false); });
   }, []);
@@ -293,10 +293,10 @@ export default function TablaCortes() {
   };
 
   const fmt = (iso: string) => {
-    const d = new Date(iso);
+    const d = parseLocalDate(iso);
     return d.toLocaleString('es-VE', {
       day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: true,
     });
   };
 

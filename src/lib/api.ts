@@ -2,6 +2,34 @@ import { createClient } from '@supabase/supabase-js';
 import SHA256 from 'crypto-js/sha256';
 import { jsPDF } from 'jspdf';
 
+/**
+ * Convierte un string de fecha a Date local correctamente.
+ * - Supabase devuelve: "2026-06-13T02:30:00+00:00" o "2026-06-13T02:30:00Z" → OK
+ * - SQLite/Tauri synced devuelve: "2026-06-13 02:30:00" (sin zona) → lo tratamos como UTC
+ * El resultado es siempre la hora correcta en la zona local del navegador.
+ */
+export function parseLocalDate(isoStr: string): Date {
+  if (!isoStr) return new Date();
+  // Normalizar separador de fecha/hora
+  const normalized = isoStr.includes('T') ? isoStr : isoStr.replace(' ', 'T');
+  // Si ya tiene zona horaria (Z o +/-HH:MM), parseamos directo
+  const hasZone = normalized.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(normalized);
+  // Sin zona asumimos UTC (así Supabase lo almacena internamente)
+  return new Date(hasZone ? normalized : normalized + 'Z');
+}
+
+export function getLocalDayRange(dateInput?: string | Date) {
+  const date = dateInput ? new Date(dateInput) : new Date();
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return {
+    start: start.toISOString(),
+    end: end.toISOString()
+  };
+}
+
 // Tipos base (basados en Prisma/Rust)
 export interface Producto {
   id: string;
@@ -179,12 +207,18 @@ export const api = {
     return ventaId;
   },
 
-  resumen_ventas_dia: async (): Promise<ResumenDia> => {
-    if (isTauri()) return invokeTauri<ResumenDia>('resumen_ventas_dia');
+  resumen_ventas_dia: async (soloPendientes: boolean = false): Promise<ResumenDia> => {
+    if (isTauri()) return invokeTauri<ResumenDia>('resumen_ventas_dia', { soloPendientes });
     
-    // Web: calculamos el resumen sumando las ventas de hoy (UTC local aproximado)
-    const hoy = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase.from('Venta').select('total, formaPago, tasaCambio').gte('creadoEn', hoy);
+    // Web: calculamos el resumen sumando las ventas de hoy (rango local del día en UTC)
+    const range = getLocalDayRange();
+    let query = supabase.from('Venta').select('total, formaPago, tasaCambio')
+      .gte('creadoEn', range.start)
+      .lte('creadoEn', range.end);
+    if (soloPendientes) {
+      query = query.is('corteCajaId', null);
+    }
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
 
     const resumen = { bs_efectivo: 0, bs_debito: 0, bs_pago_movil: 0, usd_efectivo: 0 };
@@ -215,6 +249,16 @@ export const api = {
     const id = crypto.randomUUID();
     const { error } = await supabase.from('CorteCaja').insert([{ ...payload, id, isSynced: true }]);
     if (error) throw new Error(error.message);
+
+    if (payload.tipo === 'X') {
+      const range = getLocalDayRange();
+      const { error: vErr } = await supabase.from('Venta')
+        .update({ corteCajaId: id })
+        .gte('creadoEn', range.start)
+        .lte('creadoEn', range.end)
+        .is('corteCajaId', null);
+      if (vErr) console.warn('[Corte X Web] Error asociando ventas:', vErr.message);
+    }
     return id;
   },
 
@@ -241,35 +285,85 @@ export const api = {
   generar_pdf_corte: async (payload: { corteId: string }): Promise<string> => {
     if (isTauri()) return invokeTauri<string>('generar_pdf_corte', payload);
     
-    // Web: Generación de PDF en cliente con jsPDF
-    // 1. Obtener datos del Corte
-    const { data: corte, error: cErr } = await supabase
-      .from('CorteCaja')
-      .select('*, Usuario(nombre)')
-      .eq('id', payload.corteId)
-      .single();
-      
-    if (cErr || !corte) throw new Error(`Corte no encontrado: ${cErr?.message || 'Error desconocido'}`);
-    
-    // 2. Obtener ventas del corte (para sumatorias del sistema)
-    const { data: ventas, error: vErr } = await supabase
-      .from('Venta')
-      .select('total, formaPago, tasaCambio')
-      .eq('corteCajaId', payload.corteId);
-      
-    if (vErr) console.warn('[Corte PDF] Error cargando ventas:', vErr.message);
+    let corte: any;
+    let ventas: any[] = [];
+    let lineas: any[] = [];
 
-    // 3. Obtener líneas de venta asociadas a este corte
-    const { data: lineas, error: lErr } = await supabase
-      .from('LineaVenta')
-      .select('cantidad, precioUnit, subtotal, Producto(nombre), Venta!inner(corteCajaId)')
-      .eq('Venta.corteCajaId', payload.corteId);
+    if (isTauri()) {
+      // Tauri offline: Consultar SQLite a través del nuevo comando
+      const data = await invokeTauri<any>('obtener_datos_pdf_corte', payload);
+      corte = data.corte;
+      ventas = data.ventas;
+      lineas = data.lineas;
+    } else {
+      // Web online: Consultar Supabase
+      const { data: c, error: cErr } = await supabase
+        .from('CorteCaja')
+        .select('*, Usuario(nombre)')
+        .eq('id', payload.corteId)
+        .single();
+      if (cErr || !c) throw new Error(`Corte no encontrado: ${cErr?.message || 'Error desconocido'}`);
+      
+      corte = {
+        id: c.id,
+        tipo: c.tipo,
+        usuarioId: c.usuarioId,
+        nombreUsuario: c.Usuario?.nombre || 'Desconocido',
+        totalCalculado: c.totalCalculado,
+        totalDeclarado: c.totalDeclarado,
+        diferencia: c.diferencia,
+        creadoEn: c.creadoEn,
+      };
 
-    if (lErr) console.warn('[Corte PDF] Error cargando líneas de venta:', lErr.message);
+      // Obtener ventas
+      let queryVentas = supabase.from('Venta').select('total, formaPago, tasaCambio');
+      if (corte.tipo === 'Z') {
+        const range = getLocalDayRange(corte.creadoEn);
+        queryVentas = queryVentas.gte('creadoEn', range.start).lte('creadoEn', range.end);
+      } else {
+        queryVentas = queryVentas.eq('corteCajaId', payload.corteId);
+      }
+      const { data: v, error: vErr } = await queryVentas;
+      if (vErr) console.warn('[Corte PDF Web] Error cargando ventas:', vErr.message);
+      ventas = v || [];
+
+      // Obtener líneas agrupadas
+      let queryLineas = supabase
+        .from('LineaVenta')
+        .select('cantidad, precioUnit, subtotal, Producto(nombre), Venta!inner(corteCajaId, creadoEn)');
+      if (corte.tipo === 'Z') {
+        const range = getLocalDayRange(corte.creadoEn);
+        queryLineas = queryLineas.gte('Venta.creadoEn', range.start).lte('Venta.creadoEn', range.end);
+      } else {
+        queryLineas = queryLineas.eq('Venta.corteCajaId', payload.corteId);
+      }
+      const { data: l, error: lErr } = await queryLineas;
+      if (lErr) console.warn('[Corte PDF Web] Error cargando líneas de venta:', lErr.message);
+
+      // Agrupar productos en memoria para la web
+      const prodMap: Record<string, { cant: number; precio: number; subtotal: number }> = {};
+      l?.forEach((item: any) => {
+        const nombre = item.Producto?.nombre || 'Producto Desconocido';
+        const cant = item.cantidad || 0;
+        const precio = parseFloat(item.precioUnit) || 0;
+        const sub = parseFloat(item.subtotal) || 0;
+        if (!prodMap[nombre]) {
+          prodMap[nombre] = { cant: 0, precio, subtotal: 0 };
+        }
+        prodMap[nombre].cant += cant;
+        prodMap[nombre].subtotal += sub;
+      });
+      lineas = Object.keys(prodMap).sort().map((name) => ({
+        nombreProducto: name,
+        cantidad: prodMap[name].cant,
+        precioUnit: prodMap[name].precio.toFixed(2),
+        subtotal: prodMap[name].subtotal,
+      }));
+    }
 
     // Calcular sistema y desglose
     const sys = { bsEfectivo: 0, bsDebito: 0, bsPagoMovil: 0, usdEfectivo: 0 };
-    ventas?.forEach((v) => {
+    ventas.forEach((v) => {
       const totalNum = parseFloat(v.total) || 0;
       if (v.formaPago === 'USD_EFECTIVO') {
         sys.usdEfectivo += totalNum;
@@ -282,11 +376,25 @@ export const api = {
       }
     });
 
+
     let decl: any = null;
     try {
-      decl = JSON.parse(corte.totalDeclarado);
+      const parsed = JSON.parse(corte.totalDeclarado);
+      // Asegurar que todos los campos requeridos existan
+      decl = {
+        bsEfectivo: parsed.bsEfectivo ?? '0.00',
+        bsDebito: parsed.bsDebito ?? '0.00',
+        bsPagoMovil: parsed.bsPagoMovil ?? '0.00',
+        usdEfectivo: parsed.usdEfectivo ?? '0.00',
+        totalUsdEquiv: parsed.totalUsdEquiv ?? '0.00',
+      };
     } catch {
-      decl = null;
+      // Si no es JSON válido (número plano), construir fallback completo
+      const num = parseFloat(corte.totalDeclarado) || 0;
+      decl = {
+        bsEfectivo: '0.00', bsDebito: '0.00', bsPagoMovil: '0.00',
+        usdEfectivo: '0.00', totalUsdEquiv: num.toFixed(2)
+      };
     }
 
     const doc = new jsPDF();
@@ -303,21 +411,41 @@ export const api = {
     doc.setLineWidth(0.5);
     doc.line(20, 34, 190, 34);
     
-    // Metadata
+    // Metadata (Formato de fecha solicitado: Jueves 6-11-26 y hora sin segundos)
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    const fecha = new Date(corte.creadoEn).toLocaleString('es-VE');
-    doc.text(`Fecha:        ${fecha}`, 20, 42);
-    doc.text(`Cajero:       ${corte.Usuario?.nombre || 'Desconocido'}`, 20, 48);
-    doc.text(`Transacciones: ${ventas?.length || 0}`, 20, 54);
-    doc.line(20, 58, 190, 58);
     
-    let y = 66;
+    // parseLocalDate maneja correctamente UTC de Supabase y fechas sin zona de SQLite
+    const dateObj = parseLocalDate(corte.creadoEn);
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const diaNombre = diasSemana[dateObj.getDay()];
+    const dia = dateObj.getDate();
+    const mes = dateObj.getMonth() + 1;
+    const anio2Dig = dateObj.getFullYear().toString().slice(-2);
+    const fechaFormateada = `${diaNombre} ${mes}-${dia}-${anio2Dig}`;
+    
+    // Formato 12h igual que el widget del reloj de la app (h:mmpm)
+    let horasRaw = dateObj.getHours();
+    const minutos = dateObj.getMinutes().toString().padStart(2, '0');
+    const ampm = horasRaw >= 12 ? 'pm' : 'am';
+    horasRaw = horasRaw % 12;
+    horasRaw = horasRaw ? horasRaw : 12;
+    const horaFormateada = `${horasRaw}:${minutos}${ampm}`;
 
-    if (corte.tipo === 'Z' && decl) {
+    doc.text(`Fecha:        ${fechaFormateada}`, 20, 42);
+    doc.text(`Hora:         ${horaFormateada}`, 20, 48);
+    // Mostrar el Cajero que emitió el corte
+    doc.text(`Cajero:       ${corte.nombreUsuario || corte.Usuario?.nombre || 'Desconocido'}`, 20, 54);
+    doc.text(`Transacciones: ${ventas.length}`, 20, 60);
+    doc.line(20, 64, 190, 64);
+    
+    let y = 72;
+
+    if (decl) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
-      doc.text("VENTAS DEL DIA VS CONTEO FISICO", 20, y);
+      const tituloTabla = corte.tipo === 'Z' ? 'VENTAS DEL DIA VS CONTEO FISICO' : 'VENTAS DEL TURNO VS CONTEO FISICO';
+      doc.text(tituloTabla, 20, y);
       doc.line(20, y + 2, 190, y + 2);
       y += 8;
       
@@ -387,6 +515,7 @@ export const api = {
     doc.text(`$ ${diffSign}${diffTotalUsd.toFixed(2)} USD`, 115, y);
     y += 8;
     
+    // Efectivo en caja para el inicio del siguiente día (Solo para Reporte Z)
     if (corte.tipo === 'Z' && decl) {
       doc.setFont("helvetica", "bold");
       doc.text("EFECTIVO FÍSICO EN CAJA (PARA MAÑANA):", 20, y);
@@ -398,7 +527,7 @@ export const api = {
       y += 10;
     }
     
-    // Detalle de ventas
+    // Detalle de ventas por producto (agrupado y ordenado)
     if (lineas && lineas.length > 0) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
@@ -409,43 +538,45 @@ export const api = {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       
-      const prodMap: Record<string, { cant: number; precio: number; subtotal: number }> = {};
       lineas.forEach((l: any) => {
-        const nombre = l.Producto?.nombre || 'Producto Desconocido';
-        const cant = l.cantidad || 0;
-        const precio = parseFloat(l.precioUnit) || 0;
-        const sub = parseFloat(l.subtotal) || 0;
-        
-        if (!prodMap[nombre]) {
-          prodMap[nombre] = { cant: 0, precio, subtotal: 0 };
-        }
-        prodMap[nombre].cant += cant;
-        prodMap[nombre].subtotal += sub;
-      });
-      
-      Object.keys(prodMap).sort().forEach((name) => {
         if (y > 280) {
           doc.addPage();
           y = 20;
         }
-        const item = prodMap[name];
-        doc.text(`${name} x${item.cant} @ $${item.precio.toFixed(2)} = $${item.subtotal.toFixed(2)}`, 20, y);
+        const cant = l.cantidad;
+        const precio = parseFloat(l.precioUnit) || 0;
+        const subtotal = parseFloat(l.subtotal) || 0;
+        doc.text(`${l.nombreProducto} x${cant} @ $${precio.toFixed(2)} = $${subtotal.toFixed(2)}`, 20, y);
         y += 6;
       });
     }
     
     const filename = `Corte_${corte.tipo}_${corte.id.substring(0, 8)}.pdf`;
-    doc.save(filename);
-    return filename;
+
+    if (isTauri()) {
+      // Tauri offline: guardar y abrir nativamente pasándole los bytes
+      const pdfBytes = doc.output('arraybuffer');
+      const ruta = await invokeTauri<string>('guardar_y_abrir_pdf', {
+        filename,
+        pdfBytes: Array.from(new Uint8Array(pdfBytes))
+      });
+      return ruta;
+    } else {
+      doc.save(filename);
+      return filename;
+    }
   },
 
   generar_pdf_corte_z: async (payload: any): Promise<string> => {
-    if (isTauri()) return invokeTauri<string>('generar_pdf_corte_z', payload);
+    if (isTauri()) {
+      const corteId = await invokeTauri<string>('generar_pdf_corte_z', payload);
+      return await api.generar_pdf_corte({ corteId });
+    }
     
     // Web: Registrar el Corte Z en Supabase
     const id = crypto.randomUUID();
     
-    const resumen = await api.resumen_ventas_dia();
+    const resumen = await api.resumen_ventas_dia(false);
     const tasa = parseFloat(payload.tasaCambio || '1') || 1;
     
     const totalBsSistema = (parseFloat(resumen.bsEfectivo) || 0) + (parseFloat(resumen.bsDebito) || 0) + (parseFloat(resumen.bsPagoMovil) || 0);
@@ -474,10 +605,11 @@ export const api = {
     if (cErr) throw new Error(cErr.message);
     
     // Cerrar las ventas del dia
-    const hoy = new Date().toISOString().split('T')[0];
+    const range = getLocalDayRange();
     const { error: vErr } = await supabase.from('Venta')
       .update({ corteCajaId: id })
-      .gte('creadoEn', hoy)
+      .gte('creadoEn', range.start)
+      .lte('creadoEn', range.end)
       .is('corteCajaId', null);
       
     if (vErr) console.warn('[Corte Z Web] Error cerrando ventas:', vErr.message);

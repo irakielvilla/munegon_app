@@ -269,7 +269,7 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
 
 interface ModalCorteXProps {
   tasa: string;
-  onConfirmar: (conteo: ConteoFisico) => void;
+  onConfirmar: (conteo: ConteoFisico, resumen: ResumenDia) => void;
   onCerrar: () => void;
 }
 
@@ -331,9 +331,9 @@ function ModalCorteX({ onConfirmar, onCerrar }: ModalCorteXProps) {
   const [camposEnCero, setCamposEnCero] = useState<string[]>([]);
   const [mostrarPopup, setMostrarPopup] = useState(false);
 
-  // Cargar resumen del día al montar
+  // Cargar resumen de ventas del turno actual (solo pendientes) al montar
   useEffect(() => {
-    api.resumen_ventas_dia()
+    api.resumen_ventas_dia(true)
       .then((data) => { setResumen(data); setCargando(false); })
       .catch(() => { setErrorCarga(true); setCargando(false); });
   }, []);
@@ -348,13 +348,17 @@ function ModalCorteX({ onConfirmar, onCerrar }: ModalCorteXProps) {
       setCamposEnCero(ceros);
       setMostrarPopup(true);
     } else {
-      onConfirmar(conteo);
+      if (resumen) {
+        onConfirmar(conteo, resumen);
+      }
     }
   };
 
   const confirmarDesdePopup = () => {
     setMostrarPopup(false);
-    onConfirmar(conteo);
+    if (resumen) {
+      onConfirmar(conteo, resumen);
+    }
   };
 
   // Valor del sistema para cada campo
@@ -586,34 +590,48 @@ export default function TerminalCaja() {
 
   // ── Corte X ───────────────────────────────────────────────
 
-  const procesarCorteX = async (conteo: ConteoFisico) => {
+  const procesarCorteX = async (conteo: ConteoFisico, resumen: ResumenDia) => {
     if (!session) return;
     setProcesando(true);
     setModalActivo(null);
     try {
-      // Calcular el total declarado como suma de todos los campos
-      // (Bs se convierte a USD referencial usando la tasa actual para el totalDeclarado)
       const tasa = parseFloat(config.tasa_cambio_bsd) || 1;
+
+      // Calcular el total calculado real del sistema (desde el resumen del turno)
+      const sysBs = (parseFloat(resumen.bsEfectivo) || 0)
+        + (parseFloat(resumen.bsDebito) || 0)
+        + (parseFloat(resumen.bsPagoMovil) || 0);
+      const sysUSD = parseFloat(resumen.usdEfectivo) || 0;
+      const sysTotalUsdEquiv = sysBs / tasa + sysUSD;
+
+      // Calcular el total declarado por el cajero
       const declaradoBs = (parseFloat(conteo.bsEfectivo) || 0)
         + (parseFloat(conteo.bsDebito) || 0)
         + (parseFloat(conteo.bsPagoMovil) || 0);
       const declaradoUSD = (parseFloat(conteo.usdEfectivo) || 0);
+      const declaradoTotalUsdEquiv = declaradoBs / tasa + declaradoUSD;
+
       // Guardar totalDeclarado como JSON del conteo por forma de pago
       const totalDeclaradoStr = JSON.stringify({
         bsEfectivo:  fmt2(parseFloat(conteo.bsEfectivo)  || 0),
         bsDebito:    fmt2(parseFloat(conteo.bsDebito)    || 0),
         bsPagoMovil: fmt2(parseFloat(conteo.bsPagoMovil) || 0),
         usdEfectivo: fmt2(declaradoUSD),
-        totalUsdEquiv: fmt2(declaradoBs / tasa + declaradoUSD),
+        totalUsdEquiv: fmt2(declaradoTotalUsdEquiv),
       });
-      await api.registrar_corte_caja({
+
+      const corteId = await api.registrar_corte_caja({
         tipo: 'X',
         usuarioId: session.usuarioId,
-        totalCalculado: fmt2(totalUSD),
+        totalCalculado: fmt2(sysTotalUsdEquiv),
         totalDeclarado: totalDeclaradoStr,
-        diferencia: fmt2((declaradoBs / tasa + declaradoUSD) - totalUSD),
+        diferencia: fmt2(declaradoTotalUsdEquiv - sysTotalUsdEquiv),
       });
-      setMensaje({ tipo: 'ok', texto: '✅ Corte X registrado correctamente. La sesión permanece activa.' });
+
+      // Generar y descargar el PDF de este Corte X
+      await api.generar_pdf_corte({ corteId });
+
+      setMensaje({ tipo: 'ok', texto: '✅ Corte X registrado y PDF generado. La sesión permanece activa.' });
     } catch (e) {
       setMensaje({ tipo: 'error', texto: `❌ Error en corte: ${e}` });
     } finally {

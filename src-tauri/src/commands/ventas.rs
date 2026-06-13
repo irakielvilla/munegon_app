@@ -160,7 +160,7 @@ pub fn crear_producto(
     let id = Uuid::new_v4().to_string();
     conn.execute(
         "INSERT INTO Producto (id, sku, nombre, descripcion, precioUSD, stock, stockMinimo, activo, isSynced, creadoEn, actualizadoEn)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 0, datetime('now', 'localtime'), datetime('now', 'localtime'))",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 0, datetime('now'), datetime('now'))",
         params![id, sku, nombre, descripcion, precio_usd, stock, stock_minimo],
     )
     .map_err(|e| e.to_string())?;
@@ -181,7 +181,7 @@ pub fn actualizar_producto(
     let conn = open_db().map_err(|e| e.to_string())?;
     conn.execute(
         "UPDATE Producto SET sku=?1, nombre=?2, descripcion=?3, precioUSD=?4,
-         stock=?5, stockMinimo=?6, activo=?7, isSynced=0, actualizadoEn=datetime('now', 'localtime')
+         stock=?5, stockMinimo=?6, activo=?7, isSynced=0, actualizadoEn=datetime('now')
          WHERE id=?8",
         params![sku, nombre, descripcion, precio_usd, stock, stock_minimo, activo as i32, id],
     )
@@ -221,8 +221,8 @@ pub fn obtener_configuracion() -> Result<ConfigApp, String> {
 pub fn actualizar_configuracion(clave: String, valor: String) -> Result<(), String> {
     let conn = open_db().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO Configuracion (clave, valor, updatedAt) VALUES (?1, ?2, datetime('now', 'localtime'))
-         ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor, updatedAt=datetime('now', 'localtime')",
+        "INSERT INTO Configuracion (clave, valor, updatedAt) VALUES (?1, ?2, datetime('now'))
+         ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor, updatedAt=datetime('now')",
         params![clave, valor],
     )
     .map_err(|e| e.to_string())?;
@@ -257,7 +257,7 @@ pub fn crear_venta(
 
     conn.execute(
         "INSERT INTO Venta (id, usuarioId, subtotal, impuesto, total, formaPago, moneda, referenciaPago, tasaCambio, isSynced, creadoEn)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, datetime('now', 'localtime'))",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, datetime('now'))",
         params![venta_id, usuario_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio],
     )
     .map_err(|e| e.to_string())?;
@@ -273,7 +273,7 @@ pub fn crear_venta(
 
         // Descontar stock
         conn.execute(
-            "UPDATE Producto SET stock = stock - ?1, isSynced = 0, actualizadoEn = datetime('now', 'localtime') WHERE id = ?2",
+            "UPDATE Producto SET stock = stock - ?1, isSynced = 0, actualizadoEn = datetime('now') WHERE id = ?2",
             params![linea.cantidad, linea.producto_id],
         )
         .map_err(|e| e.to_string())?;
@@ -297,10 +297,21 @@ pub fn registrar_corte_caja(
 
     conn.execute(
         "INSERT INTO CorteCaja (id, tipo, usuarioId, totalCalculado, totalDeclarado, diferencia, isSynced, creadoEn)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, datetime('now', 'localtime'))",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, datetime('now'))",
         params![corte_id, tipo, usuario_id, total_calculado, total_declarado, diferencia],
     )
     .map_err(|e| e.to_string())?;
+
+    // Si es Corte X (de turno), asociamos las ventas de hoy pendientes a este corte
+    if tipo == "X" {
+        conn.execute(
+            "UPDATE Venta SET corteCajaId = ?1, isSynced = 0
+             WHERE date(creadoEn, 'localtime') = date('now', 'localtime')
+               AND corteCajaId IS NULL",
+            params![corte_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
 
     Ok(corte_id)
 }
@@ -348,7 +359,7 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
     // Primero, obtener las ventas
     let mut stmt = conn
         .prepare(
-            "SELECT id, usuarioId, subtotal, impuesto, total, formaPago,
+            "SELECT id, usuarioId, corteCajaId, subtotal, impuesto, total, formaPago,
                     moneda, referenciaPago, tasaCambio, creadoEn
              FROM Venta WHERE isSynced = 0",
         )
@@ -357,16 +368,17 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
     let rows = stmt
         .query_map([], |row| {
             Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-                row.get::<_, Option<String>>(7)?,
-                row.get::<_, Option<String>>(8)?,
-                row.get::<_, String>(9)?,
+                row.get::<_, String>(0)?,        // id
+                row.get::<_, String>(1)?,        // usuarioId
+                row.get::<_, Option<String>>(2)?,// corteCajaId
+                row.get::<_, String>(3)?,        // subtotal
+                row.get::<_, String>(4)?,        // impuesto
+                row.get::<_, String>(5)?,        // total
+                row.get::<_, String>(6)?,        // formaPago
+                row.get::<_, String>(7)?,        // moneda
+                row.get::<_, Option<String>>(8)?,// referenciaPago
+                row.get::<_, Option<String>>(9)?,// tasaCambio
+                row.get::<_, String>(10)?,       // creadoEn
             ))
         })
         .map_err(|e| e.to_string())?;
@@ -377,7 +389,7 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
     drop(stmt);
 
     let mut ventas_json = Vec::new();
-    for (id, usuario_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio, creado_en) in sales_list {
+    for (id, usuario_id, corte_caja_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio, creado_en) in sales_list {
         // Consultar las líneas de esta venta
         let mut lineas_stmt = conn.prepare(
             "SELECT id, ventaId, productoId, cantidad, precioUnit, subtotal 
@@ -403,6 +415,7 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
         ventas_json.push(serde_json::json!({
             "id": id,
             "usuarioId": usuario_id,
+            "corteCajaId": corte_caja_id, // ← incluido para que Supabase lo reciba en el upsert
             "subtotal": subtotal,
             "impuesto": impuesto,
             "total": total,
@@ -562,19 +575,31 @@ pub struct ResumenDia {
 }
 
 #[tauri::command]
-pub fn resumen_ventas_dia() -> Result<ResumenDia, String> {
+pub fn resumen_ventas_dia(solo_pendientes: bool) -> Result<ResumenDia, String> {
     let conn = open_db().map_err(|e| e.to_string())?;
 
     // Suma para una forma de pago en Bs: total * tasaCambio
     let suma_bs = |forma: &str| -> Result<f64, String> {
-        conn.query_row(
+        let sql = if solo_pendientes {
             "SELECT COALESCE(
                 SUM(CAST(total AS REAL) * COALESCE(CAST(tasaCambio AS REAL), 1.0)),
                 0.0
              )
              FROM Venta
              WHERE formaPago = ?1
-               AND date(creadoEn) = date('now', 'localtime')",
+               AND date(creadoEn, 'localtime') = date('now', 'localtime')
+               AND corteCajaId IS NULL"
+        } else {
+            "SELECT COALESCE(
+                SUM(CAST(total AS REAL) * COALESCE(CAST(tasaCambio AS REAL), 1.0)),
+                0.0
+             )
+             FROM Venta
+             WHERE formaPago = ?1
+               AND date(creadoEn, 'localtime') = date('now', 'localtime')"
+        };
+        conn.query_row(
+            sql,
             params![forma],
             |row| row.get::<_, f64>(0),
         )
@@ -583,11 +608,20 @@ pub fn resumen_ventas_dia() -> Result<ResumenDia, String> {
 
     // Suma para USD_EFECTIVO: directamente en USD
     let suma_usd = || -> Result<f64, String> {
-        conn.query_row(
+        let sql = if solo_pendientes {
             "SELECT COALESCE(SUM(CAST(total AS REAL)), 0.0)
              FROM Venta
              WHERE formaPago = 'USD_EFECTIVO'
-               AND date(creadoEn) = date('now', 'localtime')",
+               AND date(creadoEn, 'localtime') = date('now', 'localtime')
+               AND corteCajaId IS NULL"
+        } else {
+            "SELECT COALESCE(SUM(CAST(total AS REAL)), 0.0)
+             FROM Venta
+             WHERE formaPago = 'USD_EFECTIVO'
+               AND date(creadoEn, 'localtime') = date('now', 'localtime')"
+        };
+        conn.query_row(
+            sql,
             [],
             |row| row.get::<_, f64>(0),
         )
