@@ -753,7 +753,17 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
     }
 
     // 4. Limpiar / desactivar usuarios eliminados en Supabase
-    if !pulled_user_ids.is_empty() {
+    if pulled_user_ids.is_empty() {
+        tx.execute(
+            "DELETE FROM Usuario 
+             WHERE id NOT IN (SELECT DISTINCT usuarioId FROM Venta)
+             AND id NOT IN (SELECT DISTINCT usuarioId FROM LogCambio)
+             AND id NOT IN (SELECT DISTINCT usuarioId FROM CorteCaja)",
+            [],
+        ).unwrap_or_default();
+
+        tx.execute("UPDATE Usuario SET activo = 0", []).unwrap_or_default();
+    } else {
         let placeholders = pulled_user_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
         let delete_sql = format!(
             "DELETE FROM Usuario 
@@ -774,7 +784,15 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
     }
 
     // 5. Limpiar / desactivar productos eliminados en Supabase
-    if !pulled_product_ids.is_empty() {
+    if pulled_product_ids.is_empty() {
+        tx.execute(
+            "DELETE FROM Producto 
+             WHERE id NOT IN (SELECT DISTINCT productoId FROM LineaVenta)",
+            [],
+        ).unwrap_or_default();
+
+        tx.execute("UPDATE Producto SET activo = 0", []).unwrap_or_default();
+    } else {
         let placeholders = pulled_product_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
         let delete_sql = format!(
             "DELETE FROM Producto 
@@ -793,7 +811,13 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
     }
 
     // 6. Limpiar cortes eliminados en Supabase
-    if !pulled_corte_ids.is_empty() {
+    if pulled_corte_ids.is_empty() {
+        tx.execute(
+            "DELETE FROM CorteCaja 
+             WHERE id NOT IN (SELECT DISTINCT corteCajaId FROM Venta WHERE corteCajaId IS NOT NULL)",
+            [],
+        ).unwrap_or_default();
+    } else {
         let placeholders = pulled_corte_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
         let delete_sql = format!(
             "DELETE FROM CorteCaja 

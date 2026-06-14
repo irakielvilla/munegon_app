@@ -726,14 +726,14 @@ export default function TerminalCaja() {
                   >
                     <span class="prod-nombre">{p.nombre}</span>
                     <span class="prod-sku">{p.sku}</span>
+                    <span class={`prod-stock ${p.stock <= 5 ? 'stock-bajo' : ''}`}>
+                      Stock: {p.stock}
+                    </span>
                     <div class="prod-footer">
                       <div class="prod-precio-container">
                         <span class="prod-precio">Bs {fmtBs(parseFloat(p.precioUSD) * tasaNum)}</span>
                         <span class="prod-precio-usd">${parseFloat(p.precioUSD).toFixed(2)} USD</span>
                       </div>
-                      <span class={`prod-stock ${p.stock <= 5 ? 'stock-bajo' : ''}`}>
-                        Stock: {p.stock}
-                      </span>
                     </div>
                     {enCarrito && (
                       <span class="prod-badge">{enCarrito.cantidad}</span>

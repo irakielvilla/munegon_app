@@ -215,7 +215,7 @@ export async function iniciarSyncListener(): Promise<void> {
         await invoke('forzar_sincronizacion');
       } catch (err: any) {
         console.error('[Sync] ❌ Error al forzar sincronización:', err);
-        alert('No se pudo forzar la sincronización (¿Hay internet?): ' + err);
+        showSyncToast('Sincronizacion Fallida a la nube, No hay internet', 'error');
       }
     };
 
