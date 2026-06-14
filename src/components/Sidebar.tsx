@@ -105,7 +105,7 @@ export default function Sidebar() {
       <div class="sidebar-footer">
         <div class={`sidebar-user ${colapsado ? 'sidebar-user--mini' : ''}`} title={colapsado ? `${session.nombre} (${session.rol})` : undefined}>
           <span class="sidebar-user-icon" aria-hidden="true">
-            {esAdmin ? '😎' : '🧑‍💼'}
+            {esAdmin ? '👑' : '🧑‍💼'}
           </span>
           {!colapsado && (
             <div class="sidebar-user-info">
