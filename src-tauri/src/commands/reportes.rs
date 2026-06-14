@@ -431,7 +431,7 @@ pub fn obtener_datos_pdf_corte(corte_id: String) -> Result<CortePdfDatos, String
     let mut sales_stmt = if corte.tipo == "Z" {
         conn.prepare(
             "SELECT total, formaPago, tasaCambio FROM Venta
-             WHERE date(creadoEn, 'localtime') = date(?1, 'localtime')",
+             WHERE date(substr(creadoEn, 1, 10)) = date(substr(?1, 1, 10))",
         )
     } else {
         conn.prepare(
@@ -468,7 +468,7 @@ pub fn obtener_datos_pdf_corte(corte_id: String) -> Result<CortePdfDatos, String
              FROM LineaVenta lv
              JOIN Venta v ON lv.ventaId = v.id
              JOIN Producto p ON lv.productoId = p.id
-             WHERE date(v.creadoEn, 'localtime') = date(?1, 'localtime')
+             WHERE date(substr(v.creadoEn, 1, 10)) = date(substr(?1, 1, 10))
              GROUP BY p.nombre, lv.precioUnit
              ORDER BY p.nombre ASC",
         )

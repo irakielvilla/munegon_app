@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
 
     // ── Datos para generación de PDF ────────────────────────
     if (accion === 'datos_pdf') {
-      const { corteId } = body as { corteId: string }
+      const { corteId, tzOffset } = body as { corteId: string; tzOffset?: number }
 
       // Obtener corte con usuario
       const { data: c, error: cErr } = await supabase
@@ -130,20 +130,36 @@ Deno.serve(async (req) => {
 
       // Obtener ventas del corte
       let queryVentas = supabase.from('Venta').select('total, formaPago, tasaCambio')
+      let queryLineas = supabase.from('LineaVenta').select('cantidad, precioUnit, subtotal, Producto(nombre), Venta!inner(corteCajaId, creadoEn)')
+
       if (corte.tipo === 'Z') {
-        // Para tipo Z, el cliente pasará el rango si es necesario; aquí usamos corteCajaId
-        queryVentas = queryVentas.eq('corteCajaId', corteId)
+        const offsetMinutes = tzOffset || 0;
+        const corteDate = new Date(corte.creadoEn);
+        // Ajustar la fecha UTC a tiempo local
+        corteDate.setMinutes(corteDate.getMinutes() - offsetMinutes);
+        
+        // Inicio del día local
+        const startOfDay = new Date(corteDate);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        startOfDay.setMinutes(startOfDay.getMinutes() + offsetMinutes); // Devolver a UTC
+        
+        // Fin del día local
+        const endOfDay = new Date(corteDate);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+        endOfDay.setMinutes(endOfDay.getMinutes() + offsetMinutes); // Devolver a UTC
+
+        queryVentas = queryVentas.gte('creadoEn', startOfDay.toISOString()).lte('creadoEn', endOfDay.toISOString());
+        queryLineas = queryLineas.gte('Venta.creadoEn', startOfDay.toISOString()).lte('Venta.creadoEn', endOfDay.toISOString());
       } else {
-        queryVentas = queryVentas.eq('corteCajaId', corteId)
+        queryVentas = queryVentas.eq('corteCajaId', corteId);
+        queryLineas = queryLineas.eq('Venta.corteCajaId', corteId);
       }
+
       const { data: ventas, error: vErr } = await queryVentas
       if (vErr) console.warn('[fn-cortes] Error cargando ventas:', vErr.message)
 
       // Obtener líneas agrupadas por producto
-      const { data: lineasRaw, error: lErr } = await supabase
-        .from('LineaVenta')
-        .select('cantidad, precioUnit, subtotal, Producto(nombre), Venta!inner(corteCajaId)')
-        .eq('Venta.corteCajaId', corteId)
+      const { data: lineasRaw, error: lErr } = await queryLineas
       if (lErr) console.warn('[fn-cortes] Error cargando líneas:', lErr.message)
 
       // Agrupar por producto en el servidor
