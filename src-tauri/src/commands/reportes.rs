@@ -80,8 +80,28 @@ pub fn generar_pdf_corte(corte_id: String) -> Result<String, String> {
         format!("Cajero:       {} (CAJERO)", corte.nombre_usuario)
     };
     current_layer.use_text(emisor_label, 10.0, Mm(20.0), Mm(242.0), &font_regular);
-    current_layer.use_text(format!("Transacciones: {}", ventas.len()), 10.0, Mm(20.0), Mm(235.0), &font_regular);
-    current_layer.use_text(sep, 8.0, Mm(20.0), Mm(230.0), &font_regular);
+    
+    // Parsear decl anticipadamente para obtener la tasa de cambio
+    let decl: serde_json::Value = serde_json::from_str(&corte.total_declarado)
+        .unwrap_or_else(|_| {
+            let num = corte.total_declarado.parse::<f64>().unwrap_or(0.0);
+            serde_json::json!({
+                "bsEfectivo": "0", "bsDebito": "0", "bsPagoMovil": "0", "usdEfectivo": "0", "totalUsdEquiv": format!("{:.2}", num)
+            })
+        });
+
+    let tasa_cambio_val = decl.get("tasaCambio").and_then(|v| v.as_str());
+    let tasa_str = match tasa_cambio_val {
+        Some(t) => {
+            let t_num = t.parse::<f64>().unwrap_or(0.0);
+            format!("{:.2} Bs/$", t_num)
+        },
+        None => "No registrada".to_string()
+    };
+    current_layer.use_text(format!("Tasa:         {}", tasa_str), 10.0, Mm(20.0), Mm(235.0), &font_regular);
+
+    current_layer.use_text(format!("Transacciones: {}", ventas.len()), 10.0, Mm(20.0), Mm(228.0), &font_regular);
+    current_layer.use_text(sep, 8.0, Mm(20.0), Mm(223.0), &font_regular);
 
     // ── 1. Totales de Sistema ─────────────────────────────────
     let mut sys_bs_efectivo = 0.0;
@@ -103,13 +123,6 @@ pub fn generar_pdf_corte(corte_id: String) -> Result<String, String> {
     }
 
     // ── 2. Totales Declarados (Físico) ───────────────────────
-    let decl: serde_json::Value = serde_json::from_str(&corte.total_declarado)
-        .unwrap_or_else(|_| {
-            let num = corte.total_declarado.parse::<f64>().unwrap_or(0.0);
-            serde_json::json!({
-                "bsEfectivo": "0", "bsDebito": "0", "bsPagoMovil": "0", "usdEfectivo": "0", "totalUsdEquiv": format!("{:.2}", num)
-            })
-        });
 
     let man_bs_efectivo = decl["bsEfectivo"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     let man_bs_debito = decl["bsDebito"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
@@ -118,7 +131,7 @@ pub fn generar_pdf_corte(corte_id: String) -> Result<String, String> {
     let man_total_usd_equiv = decl["totalUsdEquiv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
 
     // Tabla Comparativa
-    let mut y_pos = 223.0_f32;
+    let mut y_pos = 216.0_f32;
     let titulo_tabla = if corte.tipo == "Z" { "VENTAS DEL DIA VS CONTEO FISICO" } else { "VENTAS DEL TURNO VS CONTEO FISICO" };
     current_layer.use_text(titulo_tabla, 12.0, Mm(20.0), Mm(y_pos), &font);
     y_pos -= 5.0;

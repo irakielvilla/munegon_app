@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../../lib/api';
 import { requireAuth } from '@lib/auth';
+import ModalOverlay from '../ui/ModalOverlay';
 
 interface Producto {
   id: string;
@@ -224,8 +225,8 @@ export default function TablaInventario() {
 
       {/* ── Modal Producto ── */}
       {modal && (
-        <div class="modal-overlay" onClick={cerrarModal}>
-          <div class="modal-card inv-modal" onClick={(e) => e.stopPropagation()}>
+        <ModalOverlay>
+          <div class="modal-card inv-modal">
             <div class="modal-header">
               <h2>{modal === 'nuevo' ? '+ Nuevo Producto' : '✏️ Editar Producto'}</h2>
               <button class="modal-close" onClick={cerrarModal}>✕</button>
@@ -269,7 +270,7 @@ export default function TablaInventario() {
               </button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );

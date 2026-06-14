@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { api } from '../../lib/api';
 import { getSession, destroySession } from '@lib/auth';
+import ModalOverlay from '../ui/ModalOverlay';
 
 // ── Tipos ────────────────────────────────────────────────────
 
@@ -205,8 +206,8 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={onCerrar}>
-      <div class="modal-card" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay>
+      <div class="modal-card">
         <div class="modal-header">
           <h2>💳 Procesar Pago</h2>
           <button class="modal-close" onClick={onCerrar}>✕</button>
@@ -263,7 +264,7 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -295,8 +296,8 @@ function PopupAdvertencia({ camposEnCero, onConfirmar, onCancelar }: PopupAdvert
     : `LOS CAMPOS ${listaFormateada} ESTÁN VACÍOS.`;
 
   return (
-    <div class="popup-overlay" onClick={onCancelar}>
-      <div class="popup-card" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay isPopup>
+      <div class="popup-card">
         <div class="popup-icono">⚠️</div>
         <h3 class="popup-titulo">Advertencia</h3>
         <p class="popup-mensaje">{mensaje}</p>
@@ -310,7 +311,7 @@ function PopupAdvertencia({ camposEnCero, onConfirmar, onCancelar }: PopupAdvert
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -376,8 +377,8 @@ function ModalCorteX({ onConfirmar, onCerrar }: ModalCorteXProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={onCerrar}>
-      <div class="modal-card modal-corte" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay>
+      <div class="modal-card modal-corte">
 
         {/* ── Encabezado ── */}
         <div class="modal-header corte-header">
@@ -460,7 +461,7 @@ function ModalCorteX({ onConfirmar, onCerrar }: ModalCorteXProps) {
           />
         )}
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -622,6 +623,7 @@ export default function TerminalCaja() {
         bsPagoMovil: fmt2(parseFloat(conteo.bsPagoMovil) || 0),
         usdEfectivo: fmt2(declaradoUSD),
         totalUsdEquiv: fmt2(declaradoTotalUsdEquiv),
+        tasaCambio: config.tasa_cambio_bsd,
       });
 
       const corteId = await api.registrar_corte_caja({

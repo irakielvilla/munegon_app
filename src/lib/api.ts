@@ -389,6 +389,7 @@ export const api = {
         bsPagoMovil: parsed.bsPagoMovil ?? '0.00',
         usdEfectivo: parsed.usdEfectivo ?? '0.00',
         totalUsdEquiv: parsed.totalUsdEquiv ?? '0.00',
+        tasaCambio: parsed.tasaCambio ?? null,
       };
     } catch {
       // Si no es JSON válido (número plano), construir fallback completo
@@ -438,10 +439,14 @@ export const api = {
     doc.text(`Hora:         ${horaFormateada}`, 20, 48);
     // Mostrar el Cajero que emitió el corte
     doc.text(`Cajero:       ${corte.nombreUsuario || corte.Usuario?.nombre || 'Desconocido'}`, 20, 54);
-    doc.text(`Transacciones: ${ventas.length}`, 20, 60);
-    doc.line(20, 64, 190, 64);
     
-    let y = 72;
+    const tasaStr = decl && decl.tasaCambio ? `${parseFloat(decl.tasaCambio).toFixed(2)} Bs/$` : 'No registrada';
+    doc.text(`Tasa:         ${tasaStr}`, 20, 60);
+
+    doc.text(`Transacciones: ${ventas.length}`, 20, 66);
+    doc.line(20, 70, 190, 70);
+    
+    let y = 78;
 
     if (decl) {
       doc.setFont("helvetica", "bold");

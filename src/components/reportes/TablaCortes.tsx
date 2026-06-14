@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api, parseLocalDate, type ResumenDia, type ConfigApp } from '../../lib/api';
 import { requireAuth, getSession } from '@lib/auth';
+import ModalOverlay from '../ui/ModalOverlay';
 
 // ── Tipos ─────────────────────────────────────────────────────
 
@@ -70,8 +71,8 @@ function PopupAdvertencia({ camposEnCero, onConfirmar, onCancelar }: PopupAdvert
     : `LOS CAMPOS ${listaFormateada} ESTÁN VACÍOS.`;
 
   return (
-    <div class="popup-overlay" onClick={onCancelar}>
-      <div class="popup-card" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay isPopup>
+      <div class="popup-card">
         <div class="popup-icono">⚠️</div>
         <h3 class="popup-titulo">Advertencia</h3>
         <p class="popup-mensaje">{mensaje}</p>
@@ -81,7 +82,7 @@ function PopupAdvertencia({ camposEnCero, onConfirmar, onCancelar }: PopupAdvert
           <button class="popup-btn-si" onClick={onConfirmar}>Sí, continuar</button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -135,8 +136,8 @@ function ModalCorteZ({ onConfirmar, onCerrar, generando }: ModalCorteZProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={onCerrar}>
-      <div class="modal-card modal-corte" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay>
+      <div class="modal-card modal-corte">
         <div class="modal-header corte-header">
           <h2>📄 Emitir Corte Z — Cierre de Día</h2>
           <button class="modal-close" onClick={onCerrar} disabled={generando}>✕</button>
@@ -152,7 +153,7 @@ function ModalCorteZ({ onConfirmar, onCerrar, generando }: ModalCorteZProps) {
             <div class="corte-col-header">CONTEO FÍSICO</div>
 
             {FILAS_CORTE.map((fila) => (
-              <div class="corte-fila" key={fila.key} style={{ display: 'contents' }}>
+              <>
                 <div class="corte-celda corte-celda-sistema">
                   <span class="corte-fila-icono">{fila.icono}</span>
                   <div class="corte-fila-info">
@@ -176,7 +177,7 @@ function ModalCorteZ({ onConfirmar, onCerrar, generando }: ModalCorteZProps) {
                     <span class="conteo-unidad">{fila.unidad}</span>
                   </div>
                 </div>
-              </div>
+              </>
             ))}
           </div>
         )}
@@ -205,7 +206,7 @@ function ModalCorteZ({ onConfirmar, onCerrar, generando }: ModalCorteZProps) {
           />
         )}
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -275,6 +276,7 @@ export default function TablaCortes() {
         bsPagoMovil: fmt2(parseFloat(conteo.bsPagoMovil) || 0),
         usdEfectivo: fmt2(declaradoUSD),
         totalUsdEquiv: fmt2(totalUsdEquiv),
+        tasaCambio: config.tasa_cambio_bsd,
       });
 
       const ruta = await api.generar_pdf_corte_z({
