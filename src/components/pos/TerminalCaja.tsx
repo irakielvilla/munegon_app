@@ -666,7 +666,7 @@ export default function TerminalCaja() {
         <div class="caja-header-left">
           <span class="logo-text">Muñegon <span class="logo-pos">POS</span></span>
           <span class="cajero-badge">
-            {session?.rol === 'ADMIN' ? '👑' : '🧑‍💼'} {session?.nombre}
+            {session?.rol === 'ADMIN' ? '😎' : '🧑‍💼'} {session?.nombre}
           </span>
         </div>
 
