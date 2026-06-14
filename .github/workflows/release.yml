@@ -16,7 +16,7 @@ jobs:
       - name: setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -38,4 +38,4 @@ jobs:
           releaseBody: "Actualización automática de Muñegon POS. Consulta los cambios en esta versión."
           releaseDraft: false
           prerelease: false
-          uploadUpdaterJson: true
+          includeUpdaterJson: true
