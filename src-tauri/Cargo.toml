@@ -1,6 +1,6 @@
 [package]
 name = "munegon-pos"
-version = "0.1.0"
+version = "1.0.0"
 description = "Muñegon POS & Inventario — Sistema Offline-First"
 authors = ["Muñegon Dev Team"]
 edition = "2021"
