@@ -3,16 +3,29 @@
 // Escucha el evento "ejecutar-sincronizacion" disparado por Rust
 // y realiza la sincronización directamente en el hilo principal.
 //
+// SEGURIDAD: Las credenciales de Supabase (SERVICE_ROLE_KEY) llegan
+// en el payload del evento de Rust. Rust las lee del entorno al
+// compilar (option_env!) y las inyecta en tiempo de ejecución.
+// La key NUNCA está en ningún archivo JS estático.
+//
 // FLUJO:
-//   Rust dispara evento → listener llama invoke para obtener
-//   registros pendientes → sube a Supabase directamente →
-//   actualiza SQLite local.
+//   Rust dispara evento (con credenciales en payload)
+//   → listener crea cliente Supabase con SERVICE_ROLE_KEY
+//   → sube datos pendientes de SQLite
+//   → descarga datos actualizados
+//   → Rust marca registros como sincronizados
 // ══════════════════════════════════════════════════════════════
 
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { createClient } from '@supabase/supabase-js';
+
+// Payload que Rust inyecta en el evento (ver sync_watcher.rs)
+interface SyncEventPayload {
+  supabase_url: string;
+  service_role_key: string;
+}
 
 function showSyncToast(message: string) {
   const toast = document.createElement('div');
@@ -34,8 +47,6 @@ function showSyncToast(message: string) {
   toast.style.pointerEvents = 'none';
 
   document.body.appendChild(toast);
-
-  // Trigger reflow for transition
   void toast.offsetWidth;
   toast.style.opacity = '1';
 
@@ -45,17 +56,14 @@ function showSyncToast(message: string) {
       if (document.body.contains(toast)) {
         document.body.removeChild(toast);
       }
-    }, 500); // Wait for transition
-  }, 5000); // 5 seconds
+    }, 500);
+  }, 5000);
 }
 
-export interface SyncConfig {
-  supabaseUrl: string;
-  supabaseKey: string;
-}
-
-export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
-  const hacerSync = async () => {
+// iniciarSyncListener ya no recibe credenciales como parámetro.
+// Las credenciales llegan en el payload del evento de Rust.
+export async function iniciarSyncListener(): Promise<void> {
+  const hacerSync = async (supabaseUrl: string, serviceRoleKey: string) => {
     try {
       console.log('[Sync] 🔔 Iniciando sincronización...');
 
@@ -66,10 +74,10 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
         invoke<Record<string, unknown>[]>('obtener_cortes_pendientes'),
       ]);
 
-      console.log(`[Sync] 📦 Pendientes para subir: ${ventas.length} ventas, ${productos.length} productos, ${logs.length} logs, ${cortes.length} cortes`);
+      console.log(`[Sync] 📦 Pendientes: ${ventas.length} ventas, ${productos.length} productos, ${logs.length} logs, ${cortes.length} cortes`);
 
-      // ── EJECUTAR SYNC DIRECTAMENTE EN EL HILO PRINCIPAL ──
-      const supabase = createClient(config.supabaseUrl, config.supabaseKey);
+      // Crear cliente con SERVICE_ROLE_KEY recibida de Rust (ignora RLS)
+      const supabase = createClient(supabaseUrl, serviceRoleKey);
       let totalSynced = 0;
       const ventaIds: string[] = [];
       const productoIds: string[] = [];
@@ -93,77 +101,46 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
         totalSynced += cortes.length;
       }
 
-      // 3. Ventas y sus Lineas (Dependen de Producto y CorteCaja)
+      // 3. Ventas y sus Líneas
       if (ventas.length > 0) {
-        // Separamos las relaciones nested (lineas) de los objetos de venta principales
         const ventasData = ventas.map((v) => {
           const { lineas, ...vRest } = v;
-          return {
-            ...vRest,
-            isSynced: true
-          } as any;
+          return { ...vRest, isSynced: true } as any;
         });
-
-        // Aplanamos todas las lineas de todas las ventas para subirlas
         const lineasData = ventas.flatMap((v) => (v['lineas'] as any[] || []));
-
-        // 1. Obtener IDs de las ventas que vamos a subir
         const ventaIdsSubir = ventasData.map((v: any) => v.id as string);
 
-        // 2. Consultar en Supabase cuáles de estas ventas ya existen antes de subirlas
         const { data: existingVentas, error: checkErr } = await supabase
-          .from('Venta')
-          .select('id')
-          .in('id', ventaIdsSubir);
-
-        if (checkErr) throw new Error(`Error verificando ventas existentes: ${checkErr.message}`);
+          .from('Venta').select('id').in('id', ventaIdsSubir);
+        if (checkErr) throw new Error(`Error verificando ventas: ${checkErr.message}`);
         const existingVentaIds = new Set(existingVentas?.map((v) => v.id) || []);
 
-        // 3. Subir primero las ventas
         const { error: vErr } = await supabase.from('Venta').upsert(ventasData, { onConflict: 'id' });
         if (vErr) throw new Error(`Ventas: ${vErr.message}`);
 
-        // 4. Subir las líneas de venta
         if (lineasData.length > 0) {
           const { error: lErr } = await supabase.from('LineaVenta').upsert(lineasData, { onConflict: 'id' });
           if (lErr) throw new Error(`Lineas de venta: ${lErr.message}`);
         }
 
-        // 5. Descontar el stock en Supabase solo para las ventas que eran NUEVAS
+        // Descontar stock solo para ventas NUEVAS (no duplicadas)
         const nuevasVentas = ventas.filter((v) => !existingVentaIds.has(v['id'] as string));
-        const nuevasLineasData = nuevasVentas.flatMap((v) => (v['lineas'] as any[] || []));
+        const nuevasLineas = nuevasVentas.flatMap((v) => (v['lineas'] as any[] || []));
 
-        if (nuevasLineasData.length > 0) {
+        if (nuevasLineas.length > 0) {
           const stockUpdates: Record<string, number> = {};
-          for (const linea of nuevasLineasData) {
+          for (const linea of nuevasLineas) {
             const pid = linea.productoId;
             stockUpdates[pid] = (stockUpdates[pid] || 0) + (linea.cantidad as number);
           }
-
-          console.log(`[Sync] 📦 Descontando stock en Supabase para ${Object.keys(stockUpdates).length} productos...`);
           for (const [productoId, cantidadRestar] of Object.entries(stockUpdates)) {
             const { data: p, error: pErr } = await supabase
-              .from('Producto')
-              .select('stock')
-              .eq('id', productoId)
-              .single();
-
-            if (pErr) {
-              console.error(`[Sync] Error al obtener stock para ${productoId}:`, pErr.message);
-              continue;
-            }
-
+              .from('Producto').select('stock').eq('id', productoId).single();
+            if (pErr) { console.error(`[Sync] Error stock ${productoId}:`, pErr.message); continue; }
             if (p) {
               const { error: uErr } = await supabase
-                .from('Producto')
-                .update({ stock: p.stock - cantidadRestar })
-                .eq('id', productoId);
-
-              if (uErr) {
-                console.error(`[Sync] Error al actualizar stock para ${productoId}:`, uErr.message);
-              } else {
-                console.log(`[Sync] Stock de ${productoId} decrementado en ${cantidadRestar}. Nuevo: ${p.stock - cantidadRestar}`);
-              }
+                .from('Producto').update({ stock: p.stock - cantidadRestar }).eq('id', productoId);
+              if (uErr) console.error(`[Sync] Error update stock ${productoId}:`, uErr.message);
             }
           }
         }
@@ -172,7 +149,7 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
         totalSynced += ventas.length;
       }
 
-      // 4. Logs (Dependen de todo lo anterior y de Usuario)
+      // 4. Logs de auditoría
       if (logs.length > 0) {
         const { error } = await supabase.from('LogCambio').upsert(logs, { onConflict: 'id' });
         if (error) throw new Error(`Logs: ${error.message}`);
@@ -180,7 +157,7 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
         totalSynced += logs.length;
       }
 
-      // 5. Pull
+      // 5. Pull: descargar datos actualizados desde Supabase → SQLite
       const { data: pullUsuarios, error: uErr } = await supabase.from('Usuario').select('*');
       if (uErr) console.error('[Sync] Error pull usuarios:', uErr.message);
 
@@ -190,47 +167,50 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
       const { data: pullCortes, error: cErr } = await supabase.from('CorteCaja').select('*');
       if (cErr) console.error('[Sync] Error pull cortes:', cErr.message);
 
-      const pullData = {
-        usuarios: pullUsuarios || [],
-        productos: pullProductos || [],
-        cortes: pullCortes || []
-      };
+      await invoke('guardar_datos_pull', {
+        payload: {
+          usuarios: pullUsuarios || [],
+          productos: pullProductos || [],
+          cortes: pullCortes || [],
+        },
+      });
+      console.log(`[Sync] 📥 Pull guardado: ${pullUsuarios?.length} usuarios, ${pullProductos?.length} productos.`);
 
-      // 6. Guardar Pull en SQLite local
-      await invoke('guardar_datos_pull', { payload: pullData });
-      console.log(`[Sync] 📥 Pull guardado: ${pullData.usuarios.length} usuarios, ${pullData.productos.length} productos, ${pullData.cortes.length} cortes.`);
-
-      // 7. Marcar Push como sincronizado en SQLite
       if (totalSynced > 0) {
         await invoke('marcar_sincronizados', { ventaIds, productoIds, logIds, corteIds });
-        console.log(`[Sync] ✅ SQLite actualizado. ${totalSynced} registros marcados.`);
+        console.log(`[Sync] ✅ ${totalSynced} registros marcados como sincronizados.`);
       }
 
       showSyncToast('Sincronización exitosa con la nube');
-
-      await emit('sync-completado', {
-        timestamp: new Date().toISOString(),
-        synced: totalSynced,
-      });
+      await emit('sync-completado', { timestamp: new Date().toISOString(), synced: totalSynced });
 
     } catch (err: any) {
       console.error('[Sync] ❌ Error en sincronización:', err);
       alert('Error en Sincronización: ' + err.message);
-      await emit('sync-fallido', {
-        timestamp: new Date().toISOString(),
-        error: err.message,
-      });
+      await emit('sync-fallido', { timestamp: new Date().toISOString(), error: err.message });
     }
   };
 
-  // Truco: exponer a window para lanzarlo manualmente
-  (window as any).forzarSincronizacion = hacerSync;
-
   try {
-    // Escuchar el evento que manda Rust
-    await listen('ejecutar-sincronizacion', hacerSync);
-    console.log('[Sync] 👂 Listener activo — esperando señal de Rust.');
+    // El payload del evento incluye las credenciales inyectadas por Rust
+    await listen<SyncEventPayload>('ejecutar-sincronizacion', (event) => {
+      const { supabase_url, service_role_key } = event.payload;
+      hacerSync(supabase_url, service_role_key);
+    });
+    console.log('[Sync] 👂 Listener activo — esperando señal de Rust con credenciales.');
+
+    // Exponer función global para forzar sync manualmente desde la consola o botones
+    (window as any).forzarSincronizacion = async () => {
+      try {
+        console.log('[Sync] 🔄 Forzando sincronización manual...');
+        await invoke('forzar_sincronizacion');
+      } catch (err: any) {
+        console.error('[Sync] ❌ Error al forzar sincronización:', err);
+        alert('No se pudo forzar la sincronización (¿Hay internet?): ' + err);
+      }
+    };
+
   } catch (err) {
-    console.warn('[Sync] No se pudo registrar el listener de Tauri (¿ejecutando en navegador web?):', err);
+    console.warn('[Sync] No se pudo registrar el listener (¿ejecutando en navegador web?):', err);
   }
 }

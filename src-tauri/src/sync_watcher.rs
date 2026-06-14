@@ -1,14 +1,26 @@
 // ══════════════════════════════════════════════════════════════
 // MUÑEGON POS — Watcher de Sincronización (Rust)
 //
-// Responsabilidad ÚNICA: vigilar el tiempo y la conectividad.
-// NO toca datos. Solo dispara el evento "ejecutar-sincronizacion"
-// cuando se cumplen ambas condiciones: hay internet y pasó el intervalo.
-// El trabajo pesado lo hace el frontend (JS/Prisma/Supabase).
+// Responsabilidad: vigilar el tiempo y la conectividad.
+// Cuando hay internet y pasó el intervalo, dispara el evento
+// "ejecutar-sincronizacion" con las credenciales de Supabase
+// incluidas en el payload (leídas desde el estado de Tauri).
+//
+// SEGURIDAD: La SERVICE_ROLE_KEY viaja en el payload del evento
+// solo en tiempo de ejecución. Nunca está en ningún archivo JS.
 // ══════════════════════════════════════════════════════════════
 
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
+use crate::SupabaseConfig;
+
+/// Payload serializable que recibirá sync-listener.ts en JavaScript.
+/// Los campos usan snake_case para coincidir con la interfaz TypeScript.
+#[derive(Clone, serde::Serialize)]
+struct SyncEventPayload {
+    supabase_url: String,
+    service_role_key: String,
+}
 
 /// Inicia el bucle de vigilancia en un hilo Tokio separado.
 /// No bloquea el hilo principal de Tauri.
@@ -20,8 +32,15 @@ pub fn iniciar_watcher(app: AppHandle, intervalo_secs: u64) {
             if tiene_internet().await {
                 println!("[SyncWatcher] 🌐 Internet detectado. Disparando evento de sincronización...");
 
-                // Solo dispara el evento — JS hace el trabajo pesado
-                if let Err(e) = app.emit("ejecutar-sincronizacion", ()) {
+                // Leer las credenciales desde el estado gestionado de Tauri
+                let config = app.state::<SupabaseConfig>();
+                let payload = SyncEventPayload {
+                    supabase_url: config.url.clone(),
+                    service_role_key: config.service_role_key.clone(),
+                };
+
+                // El payload con las credenciales viaja de Rust → JS solo en este momento
+                if let Err(e) = app.emit("ejecutar-sincronizacion", payload) {
                     eprintln!("[SyncWatcher] ⚠️ Error al emitir evento: {}", e);
                 }
             } else {
@@ -44,4 +63,21 @@ async fn tiene_internet() -> bool {
         .send()
         .await
         .is_ok()
+}
+
+/// Comando invocable desde JavaScript para forzar la sincronización manualmente
+#[tauri::command]
+pub async fn forzar_sincronizacion(app: AppHandle, config: tauri::State<'_, SupabaseConfig>) -> Result<(), String> {
+    if tiene_internet().await {
+        println!("[SyncWatcher] 🌐 (Manual) Forzando sincronización. Disparando evento...");
+        let payload = SyncEventPayload {
+            supabase_url: config.url.clone(),
+            service_role_key: config.service_role_key.clone(),
+        };
+        app.emit("ejecutar-sincronizacion", payload)
+            .map_err(|e| format!("Error al emitir evento: {}", e))?;
+        Ok(())
+    } else {
+        Err("No hay conexión a internet para sincronizar.".to_string())
+    }
 }

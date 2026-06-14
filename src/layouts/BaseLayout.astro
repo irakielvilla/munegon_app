@@ -36,11 +36,11 @@ const { title = 'Muñegon POS' } = Astro.props;
     <script>
       import { iniciarSyncListener } from '../lib/sync-listener';
 
-      // Intentar iniciar el listener de sincronización. 
-      iniciarSyncListener({
-        supabaseUrl: import.meta.env.PUBLIC_SUPABASE_URL ?? '',
-        supabaseKey: import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '',
-      }).catch((err) => {
+      // El listener escucha el evento de Rust. En la versión web (sin Tauri)
+      // Rust nunca dispara el evento, por lo que este listener queda inactivo.
+      // Las credenciales de Supabase llegan en el payload del evento (desde Rust),
+      // nunca están expuestas como variables de entorno públicas.
+      iniciarSyncListener().catch((err) => {
         console.error('[BaseLayout] Error al iniciar el listener de sincronización:', err);
       });
     </script>

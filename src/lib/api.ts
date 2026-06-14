@@ -1,5 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-import SHA256 from 'crypto-js/sha256';
 import { jsPDF } from 'jspdf';
 
 /**
@@ -79,20 +77,37 @@ export interface LineaInput {
   subtotal: string;
 }
 
-// Cliente de Supabase
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Detección de entorno: Si Tauri está inyectado, estamos en Escritorio
+// ── Detección de entorno ──────────────────────────────────────
 // Nota: en Tauri v2 puede ser __TAURI__, __TAURI_INTERNALS__ o __TAURI_IPC__
 export const isTauri = () => typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window || '__TAURI_IPC__' in window);
 
-// Wrapper genérico para comandos
-// Intentamos cargar dinámicamente @tauri-apps/api/core para no romper la web.
+// Wrapper genérico para comandos Tauri (Rust)
 async function invokeTauri<T>(cmd: string, args: any = {}): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
   return await invoke<T>(cmd, args);
+}
+
+// ── Helper para llamar Edge Functions (versión web) ───────────
+// La SERVICE_ROLE_KEY vive en el servidor de Supabase. El frontend
+// solo necesita el token de acceso (MUNEGON_API_SECRET) y la URL base.
+const EDGE_BASE_URL = import.meta.env.PUBLIC_SUPABASE_URL || '';
+const EDGE_SECRET   = import.meta.env.PUBLIC_MUNEGON_API_SECRET || '';
+
+async function callEdge<T>(fn: string, body: object): Promise<T> {
+  const url = `${EDGE_BASE_URL}/functions/v1/${fn}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Munegon-Key': EDGE_SECRET,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => res.statusText);
+    throw new Error(`[Edge ${fn}] ${res.status}: ${errBody}`);
+  }
+  return res.json() as Promise<T>;
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -103,265 +118,92 @@ export const api = {
   // ── USUARIOS ──
   listar_usuarios: async (): Promise<Usuario[]> => {
     if (isTauri()) return invokeTauri<Usuario[]>('listar_usuarios');
-    const { data, error } = await supabase.from('Usuario').select('id, nombre, rol, activo').eq('activo', true).order('nombre');
-    if (error) throw new Error(error.message);
-    return data;
+    return callEdge<Usuario[]>('fn-auth', { accion: 'listar' });
   },
 
   verificar_pin: async (usuario_id: string, pin: string): Promise<boolean> => {
     if (isTauri()) return invokeTauri<boolean>('verificar_pin', { usuarioId: usuario_id, pin });
-    const hash_ingresado = SHA256(pin).toString();
-    const { data, error } = await supabase.from('Usuario').select('pin').eq('id', usuario_id).eq('activo', true).single();
-    if (error || !data) return false;
-    return data.pin === hash_ingresado;
+    return callEdge<boolean>('fn-auth', { accion: 'verificar_pin', usuarioId: usuario_id, pin });
   },
 
   // ── PRODUCTOS ──
   listar_productos: async (): Promise<Producto[]> => {
     if (isTauri()) return invokeTauri<Producto[]>('listar_productos');
-    const { data, error } = await supabase.from('Producto').select('*').eq('activo', true).gt('stock', 0).order('nombre');
-    if (error) throw new Error(error.message);
-    return data;
+    return callEdge<Producto[]>('fn-productos', { accion: 'listar' });
   },
 
   listar_productos_admin: async (): Promise<Producto[]> => {
     if (isTauri()) return invokeTauri<Producto[]>('listar_productos_admin');
-    const { data, error } = await supabase.from('Producto').select('*').order('nombre');
-    if (error) throw new Error(error.message);
-    return data;
+    return callEdge<Producto[]>('fn-productos', { accion: 'listar_admin' });
   },
 
   crear_producto: async (payload: any): Promise<void> => {
     if (isTauri()) return invokeTauri<void>('crear_producto', payload);
-    const supabasePayload = { ...payload, precioUSD: payload.precioUsd, isSynced: true };
-    delete supabasePayload.precioUsd;
-    const { error } = await supabase.from('Producto').insert([supabasePayload]);
-    if (error) throw new Error(error.message);
+    await callEdge<{ ok: boolean }>('fn-productos', { accion: 'crear', ...payload });
   },
 
   actualizar_producto: async (payload: any): Promise<void> => {
     if (isTauri()) return invokeTauri<void>('actualizar_producto', payload);
-    const supabasePayload = { ...payload };
-    if (supabasePayload.precioUsd !== undefined) {
-      supabasePayload.precioUSD = supabasePayload.precioUsd;
-      delete supabasePayload.precioUsd;
-    }
-    const { error } = await supabase.from('Producto').update(supabasePayload).eq('id', payload.id);
-    if (error) throw new Error(error.message);
+    await callEdge<{ ok: boolean }>('fn-productos', { accion: 'actualizar', ...payload });
   },
 
   // ── CONFIGURACIÓN ──
   obtener_configuracion: async (): Promise<ConfigApp> => {
     if (isTauri()) return invokeTauri<ConfigApp>('obtener_configuracion');
-    const { data, error } = await supabase.from('Configuracion').select('clave, valor');
-    if (error) throw new Error(error.message);
-    const config: any = { tasa_cambio_bsd: '1.00', iva_porcentaje: '16' };
-    data?.forEach(d => config[d.clave] = d.valor);
-    return config as ConfigApp;
+    return callEdge<ConfigApp>('fn-configuracion', { accion: 'obtener' });
   },
 
   actualizar_configuracion: async (clave: string, valor: string): Promise<void> => {
     if (isTauri()) return invokeTauri<void>('actualizar_configuracion', { clave, valor });
-    const { error } = await supabase.from('Configuracion').upsert({ clave, valor });
-    if (error) throw new Error(error.message);
+    await callEdge<{ ok: boolean }>('fn-configuracion', { accion: 'actualizar', clave, valor });
   },
 
   // ── VENTAS ──
   crear_venta: async (payload: any): Promise<string> => {
     if (isTauri()) return invokeTauri<string>('crear_venta', payload);
-    
-    // Web: Inserción manual en Supabase
-    const { lineas, ...ventaData } = payload;
-    const ventaId = crypto.randomUUID();
-    
-    // Insertar Venta
-    const { error: vErr } = await supabase.from('Venta').insert([{
-      ...ventaData,
-      id: ventaId,
-      isSynced: true
-    }]);
-    if (vErr) throw new Error(vErr.message);
-
-    // Insertar Lineas
-    if (lineas && lineas.length > 0) {
-      const lineasInsert = lineas.map((l: any) => ({
-        id: crypto.randomUUID(),
-        ventaId: ventaId,
-        productoId: l.producto_id || l.productoId,
-        cantidad: l.cantidad,
-        precioUnit: l.precio_unit || l.precioUnit,
-        subtotal: l.subtotal
-      }));
-      const { error: lErr } = await supabase.from('LineaVenta').insert(lineasInsert);
-      if (lErr) throw new Error(lErr.message);
-
-      // Actualizar stock de cada producto
-      for (const linea of lineasInsert) {
-        // Obtenemos stock actual (por seguridad, aunque deberia hacerse via RPC en produccion)
-        const { data: p } = await supabase.from('Producto').select('stock').eq('id', linea.productoId).single();
-        if (p) {
-          await supabase.from('Producto').update({ stock: p.stock - linea.cantidad }).eq('id', linea.productoId);
-        }
-      }
-    }
-    return ventaId;
+    // Web: la Edge Function maneja la inserción y el descuento de stock
+    return callEdge<string>('fn-ventas', { accion: 'crear', ...payload });
   },
 
   resumen_ventas_dia: async (soloPendientes: boolean = false): Promise<ResumenDia> => {
     if (isTauri()) return invokeTauri<ResumenDia>('resumen_ventas_dia', { soloPendientes });
-    
-    // Web: calculamos el resumen sumando las ventas de hoy (rango local del día en UTC)
+    // Web: pasamos el rango del día en hora local para que la Edge Function lo use
     const range = getLocalDayRange();
-    let query = supabase.from('Venta').select('total, formaPago, tasaCambio')
-      .gte('creadoEn', range.start)
-      .lte('creadoEn', range.end);
-    if (soloPendientes) {
-      query = query.is('corteCajaId', null);
-    }
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-
-    const resumen = { bs_efectivo: 0, bs_debito: 0, bs_pago_movil: 0, usd_efectivo: 0 };
-    data?.forEach(v => {
-      const totalNum = parseFloat(v.total);
-      if (v.formaPago === 'USD_EFECTIVO') {
-        resumen.usd_efectivo += totalNum;
-      } else {
-        const tasa = parseFloat(v.tasaCambio || '1');
-        const totalBs = totalNum * tasa;
-        if (v.formaPago === 'BS_EFECTIVO') resumen.bs_efectivo += totalBs;
-        if (v.formaPago === 'BS_DEBITO') resumen.bs_debito += totalBs;
-        if (v.formaPago === 'BS_PAGO_MOVIL') resumen.bs_pago_movil += totalBs;
-      }
+    return callEdge<ResumenDia>('fn-ventas', {
+      accion: 'resumen_dia',
+      soloPendientes,
+      rangeStart: range.start,
+      rangeEnd: range.end,
     });
-
-    return {
-      bsEfectivo: resumen.bs_efectivo.toFixed(2),
-      bsDebito: resumen.bs_debito.toFixed(2),
-      bsPagoMovil: resumen.bs_pago_movil.toFixed(2),
-      usdEfectivo: resumen.usd_efectivo.toFixed(2)
-    };
   },
 
   // ── CORTES DE CAJA ──
   registrar_corte_caja: async (payload: any): Promise<string> => {
     if (isTauri()) return invokeTauri<string>('registrar_corte_caja', payload);
-    const id = crypto.randomUUID();
-    const { error } = await supabase.from('CorteCaja').insert([{ ...payload, id, isSynced: true }]);
-    if (error) throw new Error(error.message);
-
-    if (payload.tipo === 'X') {
-      const range = getLocalDayRange();
-      const { error: vErr } = await supabase.from('Venta')
-        .update({ corteCajaId: id })
-        .gte('creadoEn', range.start)
-        .lte('creadoEn', range.end)
-        .is('corteCajaId', null);
-      if (vErr) console.warn('[Corte X Web] Error asociando ventas:', vErr.message);
-    }
-    return id;
+    // Web: la Edge Function crea el corte y asocia las ventas del rango
+    const range = getLocalDayRange();
+    return callEdge<string>('fn-cortes', {
+      accion: 'registrar_x',
+      rangeStart: range.start,
+      rangeEnd: range.end,
+      ...payload,
+    });
   },
 
   listar_cortes_caja: async (): Promise<CorteCajaInfo[]> => {
     if (isTauri()) return invokeTauri<CorteCajaInfo[]>('listar_cortes_caja');
-    const { data, error } = await supabase.from('CorteCaja')
-      .select('*, Usuario(nombre)')
-      .order('creadoEn', { ascending: false });
-    
-    if (error) throw new Error(error.message);
-    
-    const mapped = data.map((d: any) => ({
-      id: d.id,
-      tipo: d.tipo,
-      usuarioId: d.usuarioId,
-      nombreUsuario: d.Usuario?.nombre || 'Desconocido',
-      totalCalculado: d.totalCalculado,
-      totalDeclarado: d.totalDeclarado,
-      diferencia: d.diferencia,
-      creadoEn: d.creadoEn
-    }));
-
-    return mapped.sort((a, b) => new Date(b.creadoEn).getTime() - new Date(a.creadoEn).getTime());
+    return callEdge<CorteCajaInfo[]>('fn-cortes', { accion: 'listar' });
   },
 
   generar_pdf_corte: async (payload: { corteId: string }): Promise<string> => {
     if (isTauri()) return invokeTauri<string>('generar_pdf_corte', payload);
     
-    let corte: any;
-    let ventas: any[] = [];
-    let lineas: any[] = [];
-
-    if (isTauri()) {
-      // Tauri offline: Consultar SQLite a través del nuevo comando
-      const data = await invokeTauri<any>('obtener_datos_pdf_corte', payload);
-      corte = data.corte;
-      ventas = data.ventas;
-      lineas = data.lineas;
-    } else {
-      // Web online: Consultar Supabase
-      const { data: c, error: cErr } = await supabase
-        .from('CorteCaja')
-        .select('*, Usuario(nombre)')
-        .eq('id', payload.corteId)
-        .single();
-      if (cErr || !c) throw new Error(`Corte no encontrado: ${cErr?.message || 'Error desconocido'}`);
-      
-      corte = {
-        id: c.id,
-        tipo: c.tipo,
-        usuarioId: c.usuarioId,
-        nombreUsuario: c.Usuario?.nombre || 'Desconocido',
-        totalCalculado: c.totalCalculado,
-        totalDeclarado: c.totalDeclarado,
-        diferencia: c.diferencia,
-        creadoEn: c.creadoEn,
-      };
-
-      // Obtener ventas
-      let queryVentas = supabase.from('Venta').select('total, formaPago, tasaCambio');
-      if (corte.tipo === 'Z') {
-        const range = getLocalDayRange(corte.creadoEn);
-        queryVentas = queryVentas.gte('creadoEn', range.start).lte('creadoEn', range.end);
-      } else {
-        queryVentas = queryVentas.eq('corteCajaId', payload.corteId);
-      }
-      const { data: v, error: vErr } = await queryVentas;
-      if (vErr) console.warn('[Corte PDF Web] Error cargando ventas:', vErr.message);
-      ventas = v || [];
-
-      // Obtener líneas agrupadas
-      let queryLineas = supabase
-        .from('LineaVenta')
-        .select('cantidad, precioUnit, subtotal, Producto(nombre), Venta!inner(corteCajaId, creadoEn)');
-      if (corte.tipo === 'Z') {
-        const range = getLocalDayRange(corte.creadoEn);
-        queryLineas = queryLineas.gte('Venta.creadoEn', range.start).lte('Venta.creadoEn', range.end);
-      } else {
-        queryLineas = queryLineas.eq('Venta.corteCajaId', payload.corteId);
-      }
-      const { data: l, error: lErr } = await queryLineas;
-      if (lErr) console.warn('[Corte PDF Web] Error cargando líneas de venta:', lErr.message);
-
-      // Agrupar productos en memoria para la web
-      const prodMap: Record<string, { cant: number; precio: number; subtotal: number }> = {};
-      l?.forEach((item: any) => {
-        const nombre = item.Producto?.nombre || 'Producto Desconocido';
-        const cant = item.cantidad || 0;
-        const precio = parseFloat(item.precioUnit) || 0;
-        const sub = parseFloat(item.subtotal) || 0;
-        if (!prodMap[nombre]) {
-          prodMap[nombre] = { cant: 0, precio, subtotal: 0 };
-        }
-        prodMap[nombre].cant += cant;
-        prodMap[nombre].subtotal += sub;
-      });
-      lineas = Object.keys(prodMap).sort().map((name) => ({
-        nombreProducto: name,
-        cantidad: prodMap[name].cant,
-        precioUnit: prodMap[name].precio.toFixed(2),
-        subtotal: prodMap[name].subtotal,
-      }));
-    }
+    // Web: la Edge Function devuelve corte, ventas y líneas ya agrupadas
+    const { corte, ventas, lineas } = await callEdge<{
+      corte: any;
+      ventas: any[];
+      lineas: any[];
+    }>('fn-cortes', { accion: 'datos_pdf', corteId: payload.corteId });
 
     // Calcular sistema y desglose
     const sys = { bsEfectivo: 0, bsDebito: 0, bsPagoMovil: 0, usdEfectivo: 0 };
@@ -580,48 +422,34 @@ export const api = {
       return await api.generar_pdf_corte({ corteId });
     }
     
-    // Web: Registrar el Corte Z en Supabase
-    const id = crypto.randomUUID();
-    
+    // Web: calculamos el resumen localmente para determinar los totales del sistema
     const resumen = await api.resumen_ventas_dia(false);
     const tasa = parseFloat(payload.tasaCambio || '1') || 1;
     
-    const totalBsSistema = (parseFloat(resumen.bsEfectivo) || 0) + (parseFloat(resumen.bsDebito) || 0) + (parseFloat(resumen.bsPagoMovil) || 0);
-    const totalUsdSistema = (parseFloat(resumen.usdEfectivo) || 0);
-    
+    const totalBsSistema = (parseFloat(resumen.bsEfectivo) || 0)
+      + (parseFloat(resumen.bsDebito) || 0)
+      + (parseFloat(resumen.bsPagoMovil) || 0);
+    const totalUsdSistema = parseFloat(resumen.usdEfectivo) || 0;
     const sysTotalUsdEquiv = (totalBsSistema / tasa) + totalUsdSistema;
     
     let decl: any = null;
-    try {
-      decl = JSON.parse(payload.totalDeclarado);
-    } catch {
-      decl = null;
-    }
+    try { decl = JSON.parse(payload.totalDeclarado); } catch { decl = null; }
     const manTotalUsdEquiv = decl ? parseFloat(decl.totalUsdEquiv) || 0 : 0;
     const diferenciaUsd = manTotalUsdEquiv - sysTotalUsdEquiv;
 
-    const { error: cErr } = await supabase.from('CorteCaja').insert([{
-      id,
-      tipo: 'Z',
+    // Registrar el Corte Z vía Edge Function (incluye cierre de ventas del día)
+    const range = getLocalDayRange();
+    const corteId = await callEdge<string>('fn-cortes', {
+      accion: 'registrar_z',
       usuarioId: payload.usuarioId,
       totalCalculado: sysTotalUsdEquiv.toFixed(2),
       totalDeclarado: payload.totalDeclarado,
       diferencia: diferenciaUsd.toFixed(2),
-      isSynced: true
-    }]);
-    if (cErr) throw new Error(cErr.message);
-    
-    // Cerrar las ventas del dia
-    const range = getLocalDayRange();
-    const { error: vErr } = await supabase.from('Venta')
-      .update({ corteCajaId: id })
-      .gte('creadoEn', range.start)
-      .lte('creadoEn', range.end)
-      .is('corteCajaId', null);
-      
-    if (vErr) console.warn('[Corte Z Web] Error cerrando ventas:', vErr.message);
+      rangeStart: range.start,
+      rangeEnd: range.end,
+    });
 
-    // Generar y descargar el PDF en cliente
-    return await api.generar_pdf_corte({ corteId: id });
+    // Generar y descargar el PDF en el cliente
+    return await api.generar_pdf_corte({ corteId });
   }
 };
