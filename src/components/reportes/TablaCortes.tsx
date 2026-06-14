@@ -320,6 +320,7 @@ export default function TablaCortes() {
       <div class="rep-header">
         <h1>📊 Reportes — Cortes de Caja</h1>
         <div class="rep-header-actions">
+          <button class="btn-recargar" style={{ marginRight: '10px' }} onClick={() => (window as any).forzarSincronizacion?.()}>☁️ Sincronizar</button>
           <button class="btn-recargar" onClick={cargar}>🔄 Actualizar</button>
           <button class="btn-corte-z" onClick={() => setMostrarModalZ(true)} disabled={generandoZ}>
             📄 Emitir Corte Z

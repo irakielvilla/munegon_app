@@ -26,8 +26,8 @@ struct SyncEventPayload {
 /// No bloquea el hilo principal de Tauri.
 pub fn iniciar_watcher(app: AppHandle, intervalo_secs: u64) {
     tauri::async_runtime::spawn(async move {
-        // Sincronización inmediata al arrancar la aplicación
-        realizar_sync_watcher(&app).await;
+        // La sincronización inicial se delega al Frontend mediante forzarSincronizacion()
+        // para asegurar que el listener en JavaScript ya esté registrado.
 
         loop {
             tokio::time::sleep(Duration::from_secs(intervalo_secs)).await;

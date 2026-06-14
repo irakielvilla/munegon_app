@@ -214,4 +214,12 @@ export async function iniciarSyncListener(): Promise<void> {
   } catch (err) {
     console.warn('[Sync] No se pudo registrar el listener (¿ejecutando en navegador web?):', err);
   }
+
+  // Desencadenar la sincronización inicial automáticamente
+  if (typeof (window as any).forzarSincronizacion === 'function') {
+    setTimeout(() => {
+      console.log('[Sync] ⏳ Disparando sincronización inicial del sistema...');
+      (window as any).forzarSincronizacion();
+    }, 1500); // Pequeño retraso para dejar que la UI termine de montarse y renderizarse
+  }
 }
