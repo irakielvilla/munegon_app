@@ -173,6 +173,10 @@ export async function iniciarSyncListener(): Promise<void> {
       const { data: pullLineas, error: lErr } = await supabase.from('LineaVenta').select('*');
       if (lErr) console.error('[Sync] Error pull lineas:', lErr.message);
 
+      // Descargar solo el IVA para no sobreescribir la tasa de cambio local
+      const { data: pullConfig, error: cfgErr } = await supabase.from('Configuracion').select('*').eq('clave', 'iva_porcentaje');
+      if (cfgErr) console.error('[Sync] Error pull config:', cfgErr.message);
+
       await invoke('guardar_datos_pull', {
         payload: {
           usuarios: pullUsuarios || [],
@@ -180,6 +184,7 @@ export async function iniciarSyncListener(): Promise<void> {
           cortes: pullCortes || [],
           ventas: pullVentas || [],
           lineas: pullLineas || [],
+          configuracion: pullConfig || [],
         },
       });
       console.log(`[Sync] 📥 Pull guardado: ${pullUsuarios?.length} usuarios, ${pullProductos?.length} productos, ${pullVentas?.length} ventas.`);

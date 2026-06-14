@@ -673,6 +673,7 @@ pub struct PullPayload {
     cortes: Vec<serde_json::Value>,
     ventas: Option<Vec<serde_json::Value>>,
     lineas: Option<Vec<serde_json::Value>>,
+    configuracion: Option<Vec<serde_json::Value>>,
 }
 
 #[tauri::command]
@@ -877,6 +878,21 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
                  cantidad=excluded.cantidad, precioUnit=excluded.precioUnit, subtotal=excluded.subtotal",
                 params![id, venta_id, producto_id, cantidad, precio_unit, subtotal],
             );
+        }
+    }
+
+    // 9. Guardar Configuración (IVA)
+    if let Some(config) = payload.configuracion {
+        for c in config {
+            let clave = c["clave"].as_str().unwrap_or("");
+            let valor = c["valor"].as_str().unwrap_or("");
+            if !clave.is_empty() {
+                let _ = tx.execute(
+                    "INSERT INTO Configuracion (clave, valor, updatedAt) VALUES (?1, ?2, datetime('now'))
+                     ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor, updatedAt=datetime('now')",
+                    params![clave, valor],
+                );
+            }
         }
     }
 
