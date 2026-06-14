@@ -27,13 +27,13 @@ interface SyncEventPayload {
   service_role_key: string;
 }
 
-function showSyncToast(message: string) {
+function showSyncToast(message: string, tipo: 'ok' | 'error' = 'ok') {
   const toast = document.createElement('div');
   toast.innerText = message;
   toast.style.position = 'fixed';
   toast.style.bottom = '20px';
   toast.style.left = '20px';
-  toast.style.backgroundColor = '#10b981';
+  toast.style.backgroundColor = tipo === 'ok' ? '#10b981' : '#ef4444';
   toast.style.color = '#ffffff';
   toast.style.padding = '8px 16px';
   toast.style.borderRadius = '6px';
@@ -167,14 +167,22 @@ export async function iniciarSyncListener(): Promise<void> {
       const { data: pullCortes, error: cErr } = await supabase.from('CorteCaja').select('*');
       if (cErr) console.error('[Sync] Error pull cortes:', cErr.message);
 
+      const { data: pullVentas, error: vErr } = await supabase.from('Venta').select('*');
+      if (vErr) console.error('[Sync] Error pull ventas:', vErr.message);
+
+      const { data: pullLineas, error: lErr } = await supabase.from('LineaVenta').select('*');
+      if (lErr) console.error('[Sync] Error pull lineas:', lErr.message);
+
       await invoke('guardar_datos_pull', {
         payload: {
           usuarios: pullUsuarios || [],
           productos: pullProductos || [],
           cortes: pullCortes || [],
+          ventas: pullVentas || [],
+          lineas: pullLineas || [],
         },
       });
-      console.log(`[Sync] 📥 Pull guardado: ${pullUsuarios?.length} usuarios, ${pullProductos?.length} productos.`);
+      console.log(`[Sync] 📥 Pull guardado: ${pullUsuarios?.length} usuarios, ${pullProductos?.length} productos, ${pullVentas?.length} ventas.`);
 
       if (totalSynced > 0) {
         await invoke('marcar_sincronizados', { ventaIds, productoIds, logIds, corteIds });
@@ -187,7 +195,7 @@ export async function iniciarSyncListener(): Promise<void> {
     } catch (err: any) {
       console.error('[Sync] ❌ Error en sincronización:', err);
       const errorMsg = err?.message || String(err);
-      alert('Error en Sincronización: ' + errorMsg);
+      showSyncToast('Error en Sincronización: ' + errorMsg, 'error');
       await emit('sync-fallido', { timestamp: new Date().toISOString(), error: errorMsg });
     }
   };
