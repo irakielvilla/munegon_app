@@ -26,28 +26,34 @@ struct SyncEventPayload {
 /// No bloquea el hilo principal de Tauri.
 pub fn iniciar_watcher(app: AppHandle, intervalo_secs: u64) {
     tauri::async_runtime::spawn(async move {
+        // Sincronización inmediata al arrancar la aplicación
+        realizar_sync_watcher(&app).await;
+
         loop {
             tokio::time::sleep(Duration::from_secs(intervalo_secs)).await;
-
-            if tiene_internet().await {
-                println!("[SyncWatcher] 🌐 Internet detectado. Disparando evento de sincronización...");
-
-                // Leer las credenciales desde el estado gestionado de Tauri
-                let config = app.state::<SupabaseConfig>();
-                let payload = SyncEventPayload {
-                    supabase_url: config.url.clone(),
-                    service_role_key: config.service_role_key.clone(),
-                };
-
-                // El payload con las credenciales viaja de Rust → JS solo en este momento
-                if let Err(e) = app.emit("ejecutar-sincronizacion", payload) {
-                    eprintln!("[SyncWatcher] ⚠️ Error al emitir evento: {}", e);
-                }
-            } else {
-                println!("[SyncWatcher] 📴 Sin internet. Sync pospuesto.");
-            }
+            realizar_sync_watcher(&app).await;
         }
     });
+}
+
+async fn realizar_sync_watcher(app: &AppHandle) {
+    if tiene_internet().await {
+        println!("[SyncWatcher] 🌐 Internet detectado. Disparando evento de sincronización...");
+
+        // Leer las credenciales desde el estado gestionado de Tauri
+        let config = app.state::<SupabaseConfig>();
+        let payload = SyncEventPayload {
+            supabase_url: config.url.clone(),
+            service_role_key: config.service_role_key.clone(),
+        };
+
+        // El payload con las credenciales viaja de Rust → JS solo en este momento
+        if let Err(e) = app.emit("ejecutar-sincronizacion", payload) {
+            eprintln!("[SyncWatcher] ⚠️ Error al emitir evento: {}", e);
+        }
+    } else {
+        println!("[SyncWatcher] 📴 Sin internet. Sync pospuesto.");
+    }
 }
 
 /// Comprueba conectividad con un HEAD request liviano.

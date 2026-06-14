@@ -186,8 +186,9 @@ export async function iniciarSyncListener(): Promise<void> {
 
     } catch (err: any) {
       console.error('[Sync] ❌ Error en sincronización:', err);
-      alert('Error en Sincronización: ' + err.message);
-      await emit('sync-fallido', { timestamp: new Date().toISOString(), error: err.message });
+      const errorMsg = err?.message || String(err);
+      alert('Error en Sincronización: ' + errorMsg);
+      await emit('sync-fallido', { timestamp: new Date().toISOString(), error: errorMsg });
     }
   };
 
