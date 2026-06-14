@@ -2,9 +2,9 @@
 // MUÑEGON POS — Punto de entrada Tauri (lib.rs)
 // ══════════════════════════════════════════════════════════════
 
-mod sync_watcher;
 mod commands;
 pub mod db;
+mod sync_watcher;
 
 /// Estado gestionado por Tauri que almacena las credenciales de Supabase.
 /// La SERVICE_ROLE_KEY se lee en tiempo de COMPILACIÓN (option_env!) y
@@ -35,13 +35,20 @@ pub fn run() {
         .unwrap_or_else(|| std::env::var("SUPABASE_SERVICE_ROLE_KEY").unwrap_or_default());
 
     if service_role_key.is_empty() {
-        eprintln!("[App] ⚠️  SUPABASE_SERVICE_ROLE_KEY no está configurada. El sync no funcionará.");
+        eprintln!(
+            "[App] ⚠️  SUPABASE_SERVICE_ROLE_KEY no está configurada. El sync no funcionará."
+        );
     }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         // Registrar las credenciales en el estado gestionado de Tauri
-        .manage(SupabaseConfig { url: supabase_url, service_role_key })
+        .manage(SupabaseConfig {
+            url: supabase_url,
+            service_role_key,
+        })
         .setup(|app| {
             let intervalo_secs: u64 = std::env::var("SYNC_INTERVAL_SECS")
                 .unwrap_or_else(|_| "300".to_string())
@@ -51,7 +58,10 @@ pub fn run() {
             let app_handle = app.handle().clone();
             sync_watcher::iniciar_watcher(app_handle, intervalo_secs);
 
-            println!("[App] ✅ Muñegon POS iniciado. Sync watcher activo (intervalo: {}s)", intervalo_secs);
+            println!(
+                "[App] ✅ Muñegon POS iniciado. Sync watcher activo (intervalo: {}s)",
+                intervalo_secs
+            );
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -90,4 +100,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("Error al iniciar Muñegon POS");
 }
-

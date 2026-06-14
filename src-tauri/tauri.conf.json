@@ -28,7 +28,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi"],
+    "targets": [
+      "msi"
+    ],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,5 +39,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg0NkRENjkzRkQwODY1Q0YKUldUUFpRajlrOVp0aE10Z1NGRXZRWVhBMnQ0YTVveXgwbHBnV2lYaHdMd0NHbGlTb0g5LytrZTIK",
+      "endpoints": [
+        "https://github.com/irakielvilla/munegon_app/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

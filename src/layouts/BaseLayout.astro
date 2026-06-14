@@ -35,6 +35,7 @@ const { title = 'Muñegon POS' } = Astro.props;
     <!-- Inicializar el listener de sincronización al cargar la app -->
     <script>
       import { iniciarSyncListener } from '../lib/sync-listener';
+      import { iniciarChequeoActualizaciones } from '../lib/auto-updater';
 
       // El listener escucha el evento de Rust. En la versión web (sin Tauri)
       // Rust nunca dispara el evento, por lo que este listener queda inactivo.
@@ -43,6 +44,9 @@ const { title = 'Muñegon POS' } = Astro.props;
       iniciarSyncListener().catch((err) => {
         console.error('[BaseLayout] Error al iniciar el listener de sincronización:', err);
       });
+
+      // Iniciar chequeo de actualizaciones automáticamente al cargar la app
+      iniciarChequeoActualizaciones();
     </script>
   </body>
 </html>
