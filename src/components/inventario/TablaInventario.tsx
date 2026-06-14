@@ -30,6 +30,69 @@ const emptyProducto = (): Omit<Producto, 'id' | 'activo'> => ({
   stockMinimo: 5,
 });
 
+function generateSKU(name: string): string {
+  if (!name) return '';
+
+  const cleaned = name
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9\s]/g, " ");
+
+  const words = cleaned.split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 0) return '';
+
+  let sizeSuffix = '';
+  const lastWord = words[words.length - 1];
+  if (/^\d+(ML|G|GR|KG|L|OZ)?$/.test(lastWord)) {
+    const numMatch = lastWord.match(/^\d+/);
+    if (numMatch) {
+      sizeSuffix = numMatch[0];
+      words.pop();
+    }
+  }
+
+  if (words.length === 0) return sizeSuffix;
+
+  const connectors = new Set(['DE', 'CON', 'EL', 'LA', 'PARA', 'Y', 'A', 'OF', 'WITH', 'THE']);
+  const filteredWords = words.filter((w, idx) => {
+    if (idx === 0 || idx === words.length - 1) return true;
+    return !connectors.has(w) && w.length > 2;
+  });
+
+  const finalWords = filteredWords.length > 0 ? filteredWords : words;
+  const skuParts: string[] = [];
+
+  if (finalWords.length === 1) {
+    skuParts.push(finalWords[0].slice(0, 3));
+  } else if (finalWords.length === 2) {
+    skuParts.push(finalWords[0].slice(0, 3));
+    skuParts.push(finalWords[1].slice(0, 3));
+  } else {
+    skuParts.push(finalWords[0].slice(0, 3));
+    skuParts.push(finalWords[1].slice(0, 3));
+
+    if (finalWords.length === 3) {
+      skuParts.push(finalWords[2].slice(0, 3));
+    } else {
+      let variantInitials = '';
+      for (let i = 2; i < finalWords.length; i++) {
+        variantInitials += finalWords[i].charAt(0);
+      }
+      if (variantInitials) {
+        skuParts.push(variantInitials);
+      }
+    }
+  }
+
+  if (sizeSuffix) {
+    skuParts.push(sizeSuffix);
+  }
+
+  return skuParts.join('-');
+}
+
+
 export default function TablaInventario() {
   requireAuth('ADMIN');
 
@@ -41,6 +104,7 @@ export default function TablaInventario() {
   const [form, setForm] = useState(emptyProducto());
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [skuEdited, setSkuEdited] = useState(false);
 
   useEffect(() => { cargar(); }, []);
 
@@ -61,6 +125,7 @@ export default function TablaInventario() {
   const abrirNuevo = () => {
     setForm(emptyProducto());
     setEditTarget(null);
+    setSkuEdited(false);
     setModal('nuevo');
   };
 
@@ -74,10 +139,23 @@ export default function TablaInventario() {
       stockMinimo: p.stockMinimo,
     });
     setEditTarget(p);
+    setSkuEdited(true);
     setModal('editar');
   };
 
   const cerrarModal = () => { setModal(null); setEditTarget(null); };
+
+  const handleNombreInput = (e: Event) => {
+    const val = (e.target as HTMLInputElement).value.toUpperCase();
+    setForm((f) => {
+      const updated = { ...f, nombre: val };
+      if (modal === 'nuevo' && !skuEdited) {
+        updated.sku = generateSKU(val);
+      }
+      return updated;
+    });
+  };
+
 
   const handleGuardar = async () => {
     if (!form.nombre.trim() || !form.sku.trim() || !form.precioUSD) {
@@ -235,8 +313,32 @@ export default function TablaInventario() {
             <div class="inv-form">
               <div class="form-row">
                 <div class="form-group">
-                  <label for="f-sku">SKU *</label>
-                  <input id="f-sku" type="text" style={{ textTransform: 'uppercase' }} value={form.sku} onInput={(e) => setField('sku', (e.target as HTMLInputElement).value.toUpperCase())} placeholder="EJ-001" />
+                  <div class="sku-label-row">
+                    <label for="f-sku">SKU *</label>
+                    {form.nombre.trim() && (
+                      <button
+                        type="button"
+                        class="btn-auto-sku"
+                        onClick={() => {
+                          setSkuEdited(false);
+                          setField('sku', generateSKU(form.nombre));
+                        }}
+                      >
+                        Generar ⚡
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    id="f-sku"
+                    type="text"
+                    style={{ textTransform: 'uppercase' }}
+                    value={form.sku}
+                    onInput={(e) => {
+                      setSkuEdited(true);
+                      setField('sku', (e.target as HTMLInputElement).value.toUpperCase());
+                    }}
+                    placeholder="EJ-001"
+                  />
                 </div>
                 <div class="form-group">
                   <label for="f-precio">Precio USD *</label>
@@ -245,7 +347,7 @@ export default function TablaInventario() {
               </div>
               <div class="form-group">
                 <label for="f-nombre">Nombre *</label>
-                <input id="f-nombre" type="text" style={{ textTransform: 'uppercase' }} value={form.nombre} onInput={(e) => setField('nombre', (e.target as HTMLInputElement).value.toUpperCase())} placeholder="Nombre del producto" />
+                <input id="f-nombre" type="text" style={{ textTransform: 'uppercase' }} value={form.nombre} onInput={handleNombreInput} placeholder="Nombre del producto" />
               </div>
               <div class="form-group">
                 <label for="f-desc">Descripción</label>

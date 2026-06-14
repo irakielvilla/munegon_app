@@ -388,6 +388,7 @@ body {
   font-size: 0.92rem;
   font-weight: 700;
   color: var(--accent2);
+  white-space: nowrap;
 }
 
 .prod-precio-usd {
