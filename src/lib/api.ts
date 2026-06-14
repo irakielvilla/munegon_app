@@ -196,14 +196,38 @@ export const api = {
   },
 
   generar_pdf_corte: async (payload: { corteId: string }): Promise<string> => {
-    if (isTauri()) return invokeTauri<string>('generar_pdf_corte', payload);
-    
-    // Web: la Edge Function devuelve corte, ventas y líneas ya agrupadas
-    const { corte, ventas, lineas } = await callEdge<{
-      corte: any;
-      ventas: any[];
-      lineas: any[];
-    }>('fn-cortes', { accion: 'datos_pdf', corteId: payload.corteId });
+    let corte: any, ventas: any[], lineas: any[];
+    const tzOffset = new Date().getTimezoneOffset();
+
+    if (isTauri()) {
+      try {
+        // Intentar descargar desde Edge Function para obtener TODAS las ventas (incluidas las de otras laptops)
+        const data = await callEdge<{ corte: any; ventas: any[]; lineas: any[] }>('fn-cortes', { 
+          accion: 'datos_pdf', 
+          corteId: payload.corteId,
+          tzOffset 
+        });
+        corte = data.corte;
+        ventas = data.ventas;
+        lineas = data.lineas;
+      } catch (e) {
+        console.warn('[PDF] Modo offline o error de red. Usando SQLite local:', e);
+        // Fallback offline: usar base local
+        const localData = await invokeTauri<{ corte: any; ventas: any[]; lineas: any[] }>('obtener_datos_pdf_corte', { corteId: payload.corteId });
+        corte = localData.corte;
+        ventas = localData.ventas;
+        lineas = localData.lineas;
+      }
+    } else {
+      const data = await callEdge<{ corte: any; ventas: any[]; lineas: any[] }>('fn-cortes', { 
+        accion: 'datos_pdf', 
+        corteId: payload.corteId,
+        tzOffset 
+      });
+      corte = data.corte;
+      ventas = data.ventas;
+      lineas = data.lineas;
+    }
 
     // Calcular sistema y desglose
     const sys = { bsEfectivo: 0, bsDebito: 0, bsPagoMovil: 0, usdEfectivo: 0 };
