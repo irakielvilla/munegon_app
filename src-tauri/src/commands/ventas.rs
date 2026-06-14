@@ -671,6 +671,8 @@ pub struct PullPayload {
     usuarios: Vec<serde_json::Value>,
     productos: Vec<serde_json::Value>,
     cortes: Vec<serde_json::Value>,
+    ventas: Option<Vec<serde_json::Value>>,
+    lineas: Option<Vec<serde_json::Value>>,
 }
 
 #[tauri::command]
@@ -801,6 +803,57 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
         );
         let params: Vec<&str> = pulled_corte_ids.iter().map(|s| s.as_str()).collect();
         tx.execute(&delete_sql, params_from_iter(params.iter())).unwrap_or_default();
+    }
+
+    // 7. Guardar Ventas
+    if let Some(ventas) = payload.ventas {
+        for v in ventas {
+            let id = v["id"].as_str().unwrap_or("");
+            if id.is_empty() { continue; }
+            let usuario_id = v["usuarioId"].as_str().unwrap_or("");
+            let corte_caja_id = v["corteCajaId"].as_str(); // Option
+            let subtotal = v["subtotal"].as_str().unwrap_or("0.00");
+            let impuesto = v["impuesto"].as_str().unwrap_or("0.00");
+            let total = v["total"].as_str().unwrap_or("0.00");
+            let forma_pago = v["formaPago"].as_str().unwrap_or("");
+            let moneda = v["moneda"].as_str().unwrap_or("");
+            let referencia_pago = v["referenciaPago"].as_str(); // Option
+            let tasa_cambio = v["tasaCambio"].as_str(); // Option
+            let creado_en = v["creadoEn"].as_str().unwrap_or("");
+
+            let _ = tx.execute(
+                "INSERT INTO Venta (id, usuarioId, corteCajaId, subtotal, impuesto, total, formaPago, moneda, referenciaPago, tasaCambio, isSynced, creadoEn)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 1, ?11)
+                 ON CONFLICT(id) DO UPDATE SET 
+                 usuarioId=excluded.usuarioId, corteCajaId=excluded.corteCajaId, subtotal=excluded.subtotal,
+                 impuesto=excluded.impuesto, total=excluded.total, formaPago=excluded.formaPago,
+                 moneda=excluded.moneda, referenciaPago=excluded.referenciaPago, tasaCambio=excluded.tasaCambio,
+                 isSynced=1, creadoEn=excluded.creadoEn",
+                params![id, usuario_id, corte_caja_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio, creado_en],
+            );
+        }
+    }
+
+    // 8. Guardar Líneas de Venta
+    if let Some(lineas) = payload.lineas {
+        for l in lineas {
+            let id = l["id"].as_str().unwrap_or("");
+            if id.is_empty() { continue; }
+            let venta_id = l["ventaId"].as_str().unwrap_or("");
+            let producto_id = l["productoId"].as_str().unwrap_or("");
+            let cantidad = l["cantidad"].as_i64().unwrap_or(0);
+            let precio_unit = l["precioUnit"].as_str().unwrap_or("0.00");
+            let subtotal = l["subtotal"].as_str().unwrap_or("0.00");
+
+            let _ = tx.execute(
+                "INSERT INTO LineaVenta (id, ventaId, productoId, cantidad, precioUnit, subtotal)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(id) DO UPDATE SET 
+                 ventaId=excluded.ventaId, productoId=excluded.productoId,
+                 cantidad=excluded.cantidad, precioUnit=excluded.precioUnit, subtotal=excluded.subtotal",
+                params![id, venta_id, producto_id, cantidad, precio_unit, subtotal],
+            );
+        }
     }
 
     tx.commit().map_err(|e| e.to_string())?;
