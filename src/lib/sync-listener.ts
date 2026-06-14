@@ -14,6 +14,41 @@ import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { createClient } from '@supabase/supabase-js';
 
+function showSyncToast(message: string) {
+  const toast = document.createElement('div');
+  toast.innerText = message;
+  toast.style.position = 'fixed';
+  toast.style.bottom = '20px';
+  toast.style.left = '20px';
+  toast.style.backgroundColor = '#10b981';
+  toast.style.color = '#ffffff';
+  toast.style.padding = '8px 16px';
+  toast.style.borderRadius = '6px';
+  toast.style.fontSize = '14px';
+  toast.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08)';
+  toast.style.zIndex = '9999';
+  toast.style.fontWeight = '600';
+  toast.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+  toast.style.transition = 'opacity 0.5s ease-in-out';
+  toast.style.opacity = '0';
+  toast.style.pointerEvents = 'none';
+
+  document.body.appendChild(toast);
+
+  // Trigger reflow for transition
+  void toast.offsetWidth;
+  toast.style.opacity = '1';
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => {
+      if (document.body.contains(toast)) {
+        document.body.removeChild(toast);
+      }
+    }, 500); // Wait for transition
+  }, 5000); // 5 seconds
+}
+
 export interface SyncConfig {
   supabaseUrl: string;
   supabaseKey: string;
@@ -171,7 +206,7 @@ export async function iniciarSyncListener(config: SyncConfig): Promise<void> {
         console.log(`[Sync] ✅ SQLite actualizado. ${totalSynced} registros marcados.`);
       }
 
-      alert(`¡Sincronización Completada!\n\nSubidos: ${totalSynced} registros\nDescargados: ${pullData.usuarios.length} usuarios, ${pullData.productos.length} productos y ${pullData.cortes.length} cortes.`);
+      showSyncToast('Sincronización exitosa con la nube');
 
       await emit('sync-completado', {
         timestamp: new Date().toISOString(),
