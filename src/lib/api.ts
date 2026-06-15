@@ -71,10 +71,38 @@ export interface ResumenDia {
 }
 
 export interface LineaInput {
-  producto_id: string;
+  productoId: string;
   cantidad: number;
-  precio_unit: string;
+  precioUnit: string;
   subtotal: string;
+}
+
+export interface ClienteInfo {
+  id: string;
+  nombre: string;
+  apellido: string;
+  telefono: string | null;
+  activo: boolean;
+}
+
+export interface LineaDeudaInfo {
+  id: string;
+  productoId: string;
+  productoNombre: string;
+  cantidad: number;
+  precioUnit: string;
+  subtotal: string;
+}
+
+export interface DeudaInfo {
+  id: string;
+  usuarioId: string;
+  usuarioNombre: string;
+  subtotal: string;
+  impuesto: string;
+  total: string;
+  creadoEn: string;
+  lineas: LineaDeudaInfo[];
 }
 
 // ── Detección de entorno ──────────────────────────────────────
@@ -115,6 +143,34 @@ async function callEdge<T>(fn: string, body: object): Promise<T> {
 // ──────────────────────────────────────────────────────────────
 
 export const api = {
+  // ── CUENTAS POR COBRAR (LOCAL) ──
+  listar_clientes: async (): Promise<ClienteInfo[]> => {
+    if (isTauri()) return invokeTauri<ClienteInfo[]>('listar_clientes');
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  crear_cliente: async (nombre: string, apellido: string, telefono?: string): Promise<string> => {
+    if (isTauri()) return invokeTauri<string>('crear_cliente', { nombre, apellido, telefono: telefono || null });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  crear_deuda: async (payload: {
+    clienteId: string;
+    usuarioId: string;
+    subtotal: string;
+    impuesto: string;
+    total: string;
+    lineas: LineaInput[];
+  }): Promise<string> => {
+    if (isTauri()) return invokeTauri<string>('crear_deuda', payload);
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  listar_deudas_cliente: async (clienteId: string): Promise<DeudaInfo[]> => {
+    if (isTauri()) return invokeTauri<DeudaInfo[]>('listar_deudas_cliente', { clienteId });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
   // ── USUARIOS ──
   listar_usuarios: async (): Promise<Usuario[]> => {
     if (isTauri()) return invokeTauri<Usuario[]>('listar_usuarios');

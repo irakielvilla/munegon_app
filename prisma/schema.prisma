@@ -29,6 +29,7 @@ model Usuario {
   ventas  Venta[]
   logs    LogCambio[]
   cortes  CorteCaja[]
+  deudas  Deuda[]
 }
 
 enum Rol {
@@ -54,6 +55,7 @@ model Producto {
   isSynced      Boolean  @default(false) // Flag Offline-First: false = pendiente de subir
 
   lineasVenta LineaVenta[]
+  lineasDeuda LineaDeuda[]
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -149,3 +151,46 @@ model LogCambio {
   creadoEn     DateTime @default(now())
   isSynced     Boolean  @default(false)
 }
+
+// ──────────────────────────────────────────────────────────────
+// CUENTAS POR COBRAR (CAMINO B)
+// ──────────────────────────────────────────────────────────────
+
+model Cliente {
+  id        String   @id @default(uuid())
+  nombre    String
+  apellido  String
+  telefono  String?
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+  isSynced  Boolean  @default(false)
+
+  deudas    Deuda[]
+}
+
+model Deuda {
+  id          String   @id @default(uuid())
+  clienteId   String
+  cliente     Cliente  @relation(fields: [clienteId], references: [id])
+  usuarioId   String
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  subtotal    String
+  impuesto    String
+  total       String
+  creadoEn    DateTime @default(now())
+  isSynced    Boolean  @default(false)
+
+  lineas      LineaDeuda[]
+}
+
+model LineaDeuda {
+  id         String   @id @default(uuid())
+  deudaId    String
+  deuda      Deuda    @relation(fields: [deudaId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
+  cantidad   Int
+  precioUnit String
+  subtotal   String
+}
+

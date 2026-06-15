@@ -1132,3 +1132,105 @@ body {
 .popup-btn-si:hover {
   opacity: 0.88;
 }
+
+/* ── Cliente deudor en modal de pago ── */
+.cliente-cobrar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.cliente-select-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.cliente-select {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  outline: none;
+}
+
+.cliente-select:focus {
+  border-color: var(--accent);
+}
+
+.btn-nuevo-cliente {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  white-space: nowrap;
+}
+
+.btn-nuevo-cliente:hover {
+  border-color: var(--accent);
+}
+
+.nuevo-cliente-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.nuevo-cliente-form h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.nuevo-cliente-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.btn-cancelar-mini {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text2);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-cancelar-mini:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn-guardar-mini {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-guardar-mini:hover {
+  opacity: 0.9;
+}

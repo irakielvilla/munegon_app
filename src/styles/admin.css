@@ -555,3 +555,200 @@ body {
   transition: opacity 0.2s;
 }
 .popup-btn-si:hover { opacity: 0.88; }
+
+/* ── Panel Deudas Layout ── */
+.deudas-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.5rem;
+  height: calc(100vh - 100px);
+  padding: 1rem;
+}
+
+.deudas-sidebar {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--card-r);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.deudas-sidebar-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 1rem;
+  background: var(--bg3);
+}
+
+.deudas-client-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.deudas-client-card {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.deudas-client-card:hover {
+  background: var(--bg3);
+}
+
+.deudas-client-card.activo {
+  background: rgba(108, 99, 255, 0.08);
+  border-color: var(--accent);
+}
+
+.deudas-client-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.deudas-client-total {
+  font-size: 0.85rem;
+  color: var(--accent2);
+  font-weight: 700;
+}
+
+.deudas-main {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--card-r);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 1.5rem;
+}
+
+.deudas-main-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text2);
+  font-size: 0.95rem;
+  gap: 0.5rem;
+}
+
+.deudas-empty-icon {
+  font-size: 3rem;
+}
+
+.deudas-main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.deudas-main-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.deudas-total-acumulado {
+  background: rgba(224, 92, 92, 0.08);
+  border: 1px solid rgba(224, 92, 92, 0.2);
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.deudas-total-acumulado span {
+  font-size: 0.72rem;
+  color: var(--text2);
+  text-transform: uppercase;
+}
+
+.deudas-total-acumulado strong {
+  font-size: 1.25rem;
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.deudas-sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-right: 0.5rem;
+}
+
+.deuda-session-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg3);
+}
+
+.deuda-session-header {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.deuda-session-date {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.deuda-session-total {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.deuda-session-details {
+  padding: 0.75rem 1rem;
+}
+
+.deuda-items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.deuda-items-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  color: var(--text2);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.deuda-items-table td {
+  padding: 0.5rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.deuda-items-table tr:last-child td {
+  border-bottom: none;
+}

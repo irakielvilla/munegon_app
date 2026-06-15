@@ -899,3 +899,194 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
+
+// ── Commands: Cuentas por Cobrar ──────────────────────────────
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClienteInfo {
+    pub id: String,
+    pub nombre: String,
+    pub apellido: String,
+    pub telefono: Option<String>,
+    pub activo: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LineaDeudaInfo {
+    pub id: String,
+    pub producto_id: String,
+    pub producto_nombre: String,
+    pub cantidad: i64,
+    pub precio_unit: String,
+    pub subtotal: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeudaInfo {
+    pub id: String,
+    pub usuario_id: String,
+    pub usuario_nombre: String,
+    pub subtotal: String,
+    pub impuesto: String,
+    pub total: String,
+    pub creado_en: String,
+    pub lineas: Vec<LineaDeudaInfo>,
+}
+
+#[tauri::command]
+pub fn listar_clientes() -> Result<Vec<ClienteInfo>, String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, nombre, apellido, telefono, activo FROM Cliente WHERE activo = 1 ORDER BY nombre ASC")
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(ClienteInfo {
+                id: row.get(0)?,
+                nombre: row.get(1)?,
+                apellido: row.get(2)?,
+                telefono: row.get(3)?,
+                activo: row.get::<_, i32>(4)? == 1,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
+pub fn crear_cliente(nombre: String, apellido: String, telefono: Option<String>) -> Result<String, String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    let id = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO Cliente (id, nombre, apellido, telefono, activo, creadoEn, isSynced)
+         VALUES (?1, ?2, ?3, ?4, 1, datetime('now'), 0)",
+        params![id, nombre, apellido, telefono],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(id)
+}
+
+#[tauri::command]
+pub fn crear_deuda(
+    cliente_id: String,
+    usuario_id: String,
+    subtotal: String,
+    impuesto: String,
+    total: String,
+    lineas: Vec<LineaInput>,
+) -> Result<String, String> {
+    let mut conn = open_db().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    
+    let deuda_id = Uuid::new_v4().to_string();
+
+    tx.execute(
+        "INSERT INTO Deuda (id, clienteId, usuarioId, subtotal, impuesto, total, creadoEn, isSynced)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'), 0)",
+        params![deuda_id, cliente_id, usuario_id, subtotal, impuesto, total],
+    )
+    .map_err(|e| e.to_string())?;
+
+    for linea in &lineas {
+        let linea_id = Uuid::new_v4().to_string();
+        tx.execute(
+            "INSERT INTO LineaDeuda (id, deudaId, productoId, cantidad, precioUnit, subtotal)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![linea_id, deuda_id, linea.producto_id, linea.cantidad, linea.precio_unit, linea.subtotal],
+        )
+        .map_err(|e| e.to_string())?;
+
+        // Descontar stock del producto
+        tx.execute(
+            "UPDATE Producto SET stock = stock - ?1, actualizadoEn = datetime('now') WHERE id = ?2",
+            params![linea.cantidad, linea.producto_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(deuda_id)
+}
+
+#[tauri::command]
+pub fn listar_deudas_cliente(cliente_id: String) -> Result<Vec<DeudaInfo>, String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    
+    // Obtener todas las deudas del cliente
+    let mut stmt = conn
+        .prepare(
+            "SELECT d.id, d.usuarioId, u.nombre, d.subtotal, d.impuesto, d.total, d.creadoEn
+             FROM Deuda d
+             JOIN Usuario u ON d.usuarioId = u.id
+             WHERE d.clienteId = ?1
+             ORDER BY d.creadoEn DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![cliente_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?, // id
+                row.get::<_, String>(1)?, // usuarioId
+                row.get::<_, String>(2)?, // usuarioNombre
+                row.get::<_, String>(3)?, // subtotal
+                row.get::<_, String>(4)?, // impuesto
+                row.get::<_, String>(5)?, // total
+                row.get::<_, String>(6)?, // creadoEn
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let deudas_raw: Vec<_> = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    drop(stmt);
+
+    let mut resultado = Vec::new();
+
+    for (id, usuario_id, usuario_nombre, subtotal, impuesto, total, creado_en) in deudas_raw {
+        // Obtener las líneas de esta deuda
+        let mut lineas_stmt = conn
+            .prepare(
+                "SELECT ld.id, ld.productoId, p.nombre, ld.cantidad, ld.precioUnit, ld.subtotal
+                 FROM LineaDeuda ld
+                 JOIN Producto p ON ld.productoId = p.id
+                 WHERE ld.deudaId = ?1",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let lineas_rows = lineas_stmt
+            .query_map(params![id], |row| {
+                Ok(LineaDeudaInfo {
+                    id: row.get(0)?,
+                    producto_id: row.get(1)?,
+                    producto_nombre: row.get(2)?,
+                    cantidad: row.get(3)?,
+                    precio_unit: row.get(4)?,
+                    subtotal: row.get(5)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut lineas = Vec::new();
+        for lr in lineas_rows {
+            lineas.push(lr.map_err(|e| e.to_string())?);
+        }
+
+        resultado.push(DeudaInfo {
+            id,
+            usuario_id,
+            usuario_nombre,
+            subtotal,
+            impuesto,
+            total,
+            creado_en,
+            lineas,
+        });
+    }
+
+    Ok(resultado)
+}

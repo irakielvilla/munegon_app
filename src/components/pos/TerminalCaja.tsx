@@ -29,7 +29,7 @@ interface ConfigApp {
   iva_porcentaje: string;
 }
 
-type FormaPago = 'USD_EFECTIVO' | 'BS_EFECTIVO' | 'BS_DEBITO' | 'BS_PAGO_MOVIL';
+type FormaPago = 'USD_EFECTIVO' | 'BS_EFECTIVO' | 'BS_DEBITO' | 'BS_PAGO_MOVIL' | 'CUENTA_COBRAR';
 type ModalActivo = null | 'pago' | 'corte';
 
 // ── Tipos Corte X ─────────────────────────────────────────────
@@ -180,13 +180,21 @@ function Reloj() {
 interface ModalPagoProps {
   totalUSD: number;
   tasa: string;
-  onConfirmar: (forma: FormaPago, referencia?: string) => void;
+  onConfirmar: (forma: FormaPago, referencia?: string, clienteId?: string) => void;
   onCerrar: () => void;
 }
 
 function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
   const [forma, setForma] = useState<FormaPago>('BS_EFECTIVO');
   const [referencia, setReferencia] = useState('');
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [clienteId, setClienteId] = useState('');
+  const [creandoCliente, setCreandoCliente] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevoApellido, setNuevoApellido] = useState('');
+  const [nuevoTelefono, setNuevoTelefono] = useState('');
+  const [cargandoClientes, setCargandoClientes] = useState(false);
+
   const tasaNum = parseFloat(tasa) || 1;
   const totalBs = totalUSD * tasaNum;
 
@@ -195,14 +203,61 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
     { key: 'BS_EFECTIVO', label: 'Bs Efectivo', icon: '💴' },
     { key: 'BS_DEBITO', label: 'Bs Débito', icon: '💳' },
     { key: 'BS_PAGO_MOVIL', label: 'Pago Móvil', icon: '📱' },
+    { key: 'CUENTA_COBRAR', label: 'A Crédito', icon: '👥' },
   ];
+
+  useEffect(() => {
+    if (forma === 'CUENTA_COBRAR') {
+      cargarClientes();
+    }
+  }, [forma]);
+
+  const cargarClientes = async () => {
+    setCargandoClientes(true);
+    try {
+      const lista = await api.listar_clientes();
+      setClientes(lista);
+      if (lista.length > 0 && !clienteId) {
+        setClienteId(lista[0].id);
+      }
+    } catch (e) {
+      console.error('Error cargando clientes:', e);
+    } finally {
+      setCargandoClientes(false);
+    }
+  };
+
+  const handleCrearCliente = async () => {
+    if (!nuevoNombre.trim() || !nuevoApellido.trim()) {
+      alert('Nombre y apellido son obligatorios.');
+      return;
+    }
+    try {
+      const id = await api.crear_cliente(nuevoNombre.trim(), nuevoApellido.trim(), nuevoTelefono.trim() || undefined);
+      alert('Cliente creado correctamente');
+      setNuevoNombre('');
+      setNuevoApellido('');
+      setNuevoTelefono('');
+      setCreandoCliente(false);
+      
+      const lista = await api.listar_clientes();
+      setClientes(lista);
+      setClienteId(id);
+    } catch (e) {
+      alert(`Error creando cliente: ${e}`);
+    }
+  };
 
   const handleConfirmar = () => {
     if (forma === 'BS_PAGO_MOVIL' && !referencia.trim()) {
       alert('La referencia del Pago Móvil es obligatoria.');
       return;
     }
-    onConfirmar(forma, referencia.trim() || undefined);
+    if (forma === 'CUENTA_COBRAR' && !clienteId) {
+      alert('Debes seleccionar un cliente.');
+      return;
+    }
+    onConfirmar(forma, referencia.trim() || undefined, forma === 'CUENTA_COBRAR' ? clienteId : undefined);
   };
 
   return (
@@ -254,6 +309,100 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
               }}
               maxLength={4}
             />
+          </div>
+        )}
+
+        {forma === 'CUENTA_COBRAR' && (
+          <div class="cliente-cobrar-section">
+            {!creandoCliente ? (
+              <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <label for="cliente-select" style={{ fontSize: '0.78rem', color: 'var(--text2)' }}>Seleccionar Cliente *</label>
+                <div class="cliente-select-row">
+                  {cargandoClientes ? (
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Cargando clientes...</span>
+                  ) : (
+                    <select
+                      id="cliente-select"
+                      value={clienteId}
+                      onChange={(e) => setClienteId((e.target as HTMLSelectElement).value)}
+                      class="cliente-select"
+                    >
+                      {clientes.length === 0 ? (
+                        <option value="">No hay clientes registrados</option>
+                      ) : (
+                        clientes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre} {c.apellido}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    class="btn-nuevo-cliente"
+                    onClick={() => setCreandoCliente(true)}
+                  >
+                    ➕ Nuevo
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div class="nuevo-cliente-form">
+                <h4>➕ Registrar Nuevo Cliente</h4>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <div class="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <label for="nuevo-nombre" style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Nombre *</label>
+                    <input
+                      id="nuevo-nombre"
+                      type="text"
+                      value={nuevoNombre}
+                      onInput={(e) => setNuevoNombre((e.target as HTMLInputElement).value)}
+                      placeholder="Ej. Daniel"
+                      style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                  <div class="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <label for="nuevo-apellido" style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Apellido *</label>
+                    <input
+                      id="nuevo-apellido"
+                      type="text"
+                      value={nuevoApellido}
+                      onInput={(e) => setNuevoApellido((e.target as HTMLInputElement).value)}
+                      placeholder="Ej. Trejo"
+                      style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+                <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.25rem' }}>
+                  <label for="nuevo-telefono" style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Teléfono (Opcional)</label>
+                  <input
+                    id="nuevo-telefono"
+                    type="text"
+                    value={nuevoTelefono}
+                    onInput={(e) => setNuevoTelefono((e.target as HTMLInputElement).value)}
+                    placeholder="Ej. 04121234567"
+                    style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+                <div class="nuevo-cliente-actions">
+                  <button
+                    type="button"
+                    class="btn-cancelar-mini"
+                    onClick={() => setCreandoCliente(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-guardar-mini"
+                    onClick={handleCrearCliente}
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -561,28 +710,46 @@ export default function TerminalCaja() {
 
   // ── Pago ──────────────────────────────────────────────────
 
-  const procesarPago = async (forma: FormaPago, referencia?: string) => {
+  const procesarPago = async (forma: FormaPago, referencia?: string, clienteId?: string) => {
     if (!session) return;
     setProcesando(true);
     setModalActivo(null);
     try {
-      await api.crear_venta({
-        usuarioId: session.usuarioId,
-        subtotal: fmt2(subtotalUSD),
-        impuesto: fmt2(impuestoUSD),
-        total: fmt2(totalUSD),
-        formaPago: forma,
-        moneda: forma.startsWith('USD') ? 'USD' : 'BS',
-        referenciaPago: referencia ?? null,
-        tasaCambio: config.tasa_cambio_bsd,
-        lineas: carrito.map((l) => ({
-          productoId: l.producto.id,
-          cantidad: l.cantidad,
-          precioUnit: l.producto.precioUSD,
-          subtotal: fmt2(parseFloat(l.producto.precioUSD) * l.cantidad),
-        })),
-      });
-      setMensaje({ tipo: 'ok', texto: '✅ Venta registrada correctamente' });
+      if (forma === 'CUENTA_COBRAR') {
+        if (!clienteId) throw new Error('Cliente no seleccionado');
+        await api.crear_deuda({
+          clienteId,
+          usuarioId: session.usuarioId,
+          subtotal: fmt2(subtotalUSD),
+          impuesto: fmt2(impuestoUSD),
+          total: fmt2(totalUSD),
+          lineas: carrito.map((l) => ({
+            productoId: l.producto.id,
+            cantidad: l.cantidad,
+            precioUnit: l.producto.precioUSD,
+            subtotal: fmt2(parseFloat(l.producto.precioUSD) * l.cantidad),
+          })),
+        });
+        setMensaje({ tipo: 'ok', texto: '✅ Cuenta por cobrar registrada correctamente' });
+      } else {
+        await api.crear_venta({
+          usuarioId: session.usuarioId,
+          subtotal: fmt2(subtotalUSD),
+          impuesto: fmt2(impuestoUSD),
+          total: fmt2(totalUSD),
+          formaPago: forma,
+          moneda: forma.startsWith('USD') ? 'USD' : 'BS',
+          referenciaPago: referencia ?? null,
+          tasaCambio: config.tasa_cambio_bsd,
+          lineas: carrito.map((l) => ({
+            productoId: l.producto.id,
+            cantidad: l.cantidad,
+            precioUnit: l.producto.precioUSD,
+            subtotal: fmt2(parseFloat(l.producto.precioUSD) * l.cantidad),
+          })),
+        });
+        setMensaje({ tipo: 'ok', texto: '✅ Venta registrada correctamente' });
+      }
       vaciarCarrito();
       cargarProductos(); // refresca stock
     } catch (e) {

@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/caja',       icon: '🖥',  label: 'Caja' },
   { href: '/comandas',   icon: '📋',  label: 'Comandas' },
   { href: '/inventario', icon: '📦',  label: 'Inventario' },
+  { href: '/deudas',     icon: '👥',  label: 'Deudas' },
   { href: '/reportes',   icon: '📊',  label: 'Reportes',   soloAdmin: true },
   { href: '/administracion', icon: '⚙️',  label: 'Administración', soloAdmin: true },
 ];

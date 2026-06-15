@@ -1,0 +1,22 @@
+---
+// Muñegon POS — Cuentas por Cobrar
+// Acceso: ADMIN + CAJERO
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Sidebar from '../components/Sidebar';
+import AuthGuard from '../components/AuthGuard';
+import PanelDeudas from '../components/deudas/PanelDeudas';
+import '../styles/sidebar.css';
+import '../styles/admin.css';
+import '../styles/caja.css';
+---
+
+<BaseLayout title="Cuentas por Cobrar">
+  <div class="app-layout">
+    <Sidebar client:only="preact" />
+    <div class="app-content">
+      <AuthGuard client:only="preact">
+        <PanelDeudas client:only="preact" />
+      </AuthGuard>
+    </div>
+  </div>
+</BaseLayout>

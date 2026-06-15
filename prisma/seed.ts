@@ -76,6 +76,22 @@ async function main() {
     console.log(`  ⚙️  ${c.clave} = ${c.valor}`);
   }
 
+  // ── Clientes ──────────────────────────────────────────────
+  const clientes = [
+    { id: 'seed-cliente-daniel', nombre: 'Daniel', apellido: 'Trejo', telefono: '04121234567' },
+    { id: 'seed-cliente-carlos', nombre: 'Carlos', apellido: 'Perez', telefono: '04249876543' },
+    { id: 'seed-cliente-maria', nombre: 'Maria', apellido: 'Gomez', telefono: '04161112233' },
+  ];
+
+  for (const c of clientes) {
+    await prisma.cliente.upsert({
+      where: { id: c.id },
+      update: { nombre: c.nombre, apellido: c.apellido, telefono: c.telefono },
+      create: c,
+    });
+    console.log(`  👥 Cliente: ${c.nombre} ${c.apellido}`);
+  }
+
   console.log('\n✨ Seed completado.');
   console.log('⚠️  Cambia los PINs antes de entregar al cliente.\n');
 }
