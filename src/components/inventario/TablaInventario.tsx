@@ -94,7 +94,7 @@ function generateSKU(name: string): string {
 
 
 export default function TablaInventario() {
-  requireAuth('ADMIN');
+  requireAuth();
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [busqueda, setBusqueda] = useState('');
