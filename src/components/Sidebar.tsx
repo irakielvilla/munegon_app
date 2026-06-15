@@ -19,7 +19,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/caja',       icon: '🖥',  label: 'Caja' },
   { href: '/comandas',   icon: '📋',  label: 'Comandas' },
-  { href: '/inventario', icon: '📦',  label: 'Inventario', soloAdmin: true },
+  { href: '/inventario', icon: '📦',  label: 'Inventario' },
   { href: '/reportes',   icon: '📊',  label: 'Reportes',   soloAdmin: true },
   { href: '/administracion', icon: '⚙️',  label: 'Administración', soloAdmin: true },
 ];

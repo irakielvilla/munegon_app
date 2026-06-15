@@ -1,6 +1,6 @@
 ---
 // Muñegon POS — Módulo de Inventario
-// Acceso: solo ADMIN
+// Acceso: ADMIN + CAJERO
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Sidebar from '../components/Sidebar';
 import AuthGuard from '../components/AuthGuard';
@@ -13,7 +13,7 @@ import '../styles/admin.css';
   <div class="app-layout">
     <Sidebar client:only="preact" />
     <div class="app-content">
-      <AuthGuard rol="ADMIN" client:only="preact">
+      <AuthGuard client:only="preact">
         <TablaInventario client:only="preact" />
       </AuthGuard>
     </div>
