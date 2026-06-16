@@ -480,16 +480,8 @@
      LÓGICA DE CLIENTE
      ══════════════════════════════════════════════════════════ -->
 <script>
-  import { api } from "../lib/api";
+  import { api, type Usuario } from "../lib/api";
   import { saveSession } from "../lib/auth";
-
-  // ── Tipos ───────────────────────────────────────────────────
-  interface Usuario {
-    id: string;
-    nombre: string;
-    rol: "ADMIN" | "CAJERO";
-    activo: boolean;
-  }
 
   // ── Estado ──────────────────────────────────────────────────
   let usuarioSeleccionado: Usuario | null = null;
@@ -669,7 +661,7 @@
         saveSession({
           usuarioId: usuarioSeleccionado.id,
           nombre: usuarioSeleccionado.nombre,
-          rol: usuarioSeleccionado.rol,
+          rol: usuarioSeleccionado.rol as "ADMIN" | "CAJERO",
         });
 
         // Redirigir según rol (siempre a /caja como punto de entrada)
