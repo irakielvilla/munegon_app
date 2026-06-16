@@ -66,6 +66,14 @@ function detectarCamposEnCero(conteo: ConteoFisico): string[] {
 const fmt2 = (n: number) => n.toFixed(2);
 const fmtBs = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
+const getProductPriceUSD = (p: Producto, rate: number) => {
+  if (p.precioUSD.startsWith('BS:')) {
+    const bsVal = parseFloat(p.precioUSD.substring(3)) || 0;
+    return bsVal / rate;
+  }
+  return parseFloat(p.precioUSD) || 0;
+};
+
 // ══════════════════════════════════════════════════════════════
 // WIDGET TASA DE CAMBIO
 // ══════════════════════════════════════════════════════════════
@@ -550,14 +558,14 @@ export default function TerminalCaja() {
 
   // ── Totales ───────────────────────────────────────────────
 
+  const tasaNum = parseFloat(config.tasa_cambio_bsd) || 1;
   const subtotalUSD = carrito.reduce(
-    (acc, l) => acc + parseFloat(l.producto.precioUSD) * l.cantidad,
+    (acc, l) => acc + getProductPriceUSD(l.producto, tasaNum) * l.cantidad,
     0,
   );
   const ivaPorc = parseFloat(config.iva_porcentaje) / 100;
   const impuestoUSD = subtotalUSD * ivaPorc;
   const totalUSD = subtotalUSD + impuestoUSD;
-  const tasaNum = parseFloat(config.tasa_cambio_bsd) || 1;
 
   // ── Pago ──────────────────────────────────────────────────
 
@@ -575,12 +583,15 @@ export default function TerminalCaja() {
         moneda: forma.startsWith('USD') ? 'USD' : 'BS',
         referenciaPago: referencia ?? null,
         tasaCambio: config.tasa_cambio_bsd,
-        lineas: carrito.map((l) => ({
-          productoId: l.producto.id,
-          cantidad: l.cantidad,
-          precioUnit: l.producto.precioUSD,
-          subtotal: fmt2(parseFloat(l.producto.precioUSD) * l.cantidad),
-        })),
+        lineas: carrito.map((l) => {
+          const unitPriceUSD = getProductPriceUSD(l.producto, tasaNum);
+          return {
+            productoId: l.producto.id,
+            cantidad: l.cantidad,
+            precioUnit: unitPriceUSD.toFixed(4),
+            subtotal: fmt2(unitPriceUSD * l.cantidad),
+          };
+        }),
       });
       setMensaje({ tipo: 'ok', texto: '✅ Venta registrada correctamente' });
       vaciarCarrito();
@@ -731,8 +742,17 @@ export default function TerminalCaja() {
                     </span>
                     <div class="prod-footer">
                       <div class="prod-precio-container">
-                        <span class="prod-precio">Bs {fmtBs(parseFloat(p.precioUSD) * tasaNum)}</span>
-                        <span class="prod-precio-usd">${parseFloat(p.precioUSD).toFixed(2)} USD</span>
+                        {p.precioUSD.startsWith('BS:') ? (
+                          <>
+                            <span class="prod-precio">Bs {fmtBs(parseFloat(p.precioUSD.substring(3)) || 0)}</span>
+                            <span class="prod-precio-usd">${((parseFloat(p.precioUSD.substring(3)) || 0) / tasaNum).toFixed(2)} USD</span>
+                          </>
+                        ) : (
+                          <>
+                            <span class="prod-precio">Bs {fmtBs((parseFloat(p.precioUSD) || 0) * tasaNum)}</span>
+                            <span class="prod-precio-usd">${(parseFloat(p.precioUSD) || 0).toFixed(2)} USD</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     {enCarrito && (
@@ -763,7 +783,7 @@ export default function TerminalCaja() {
                   <div class="linea-info">
                     <span class="linea-nombre">{l.producto.nombre}</span>
                     <span class="linea-precio">
-                      Bs {fmtBs(parseFloat(l.producto.precioUSD) * l.cantidad * tasaNum)}
+                      Bs {fmtBs(getProductPriceUSD(l.producto, tasaNum) * l.cantidad * tasaNum)}
                     </span>
                   </div>
                   <div class="linea-controls">

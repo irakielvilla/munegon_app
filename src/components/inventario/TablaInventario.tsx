@@ -106,12 +106,22 @@ export default function TablaInventario() {
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [skuEdited, setSkuEdited] = useState(false);
 
+  const [tasa, setTasa] = useState<number>(1);
+  const [precioUSDInput, setPrecioUSDInput] = useState('');
+  const [precioBSInput, setPrecioBSInput] = useState('');
+  const [seBasaEn, setSeBasaEn] = useState<'USD' | 'BS'>('USD');
+
   useEffect(() => { cargar(); }, []);
 
   const cargar = async () => {
     try {
-      const data = await api.listar_productos_admin();
+      const [data, configData] = await Promise.all([
+        api.listar_productos_admin(),
+        api.obtener_configuracion()
+      ]);
       setProductos(data);
+      const rate = parseFloat(configData.tasa_cambio_bsd) || 1;
+      setTasa(rate);
     } catch (e) {
       flashMsg('error', `Error cargando productos: ${e}`);
     }
@@ -124,6 +134,9 @@ export default function TablaInventario() {
 
   const abrirNuevo = () => {
     setForm(emptyProducto());
+    setPrecioUSDInput('');
+    setPrecioBSInput('');
+    setSeBasaEn('USD');
     setEditTarget(null);
     setSkuEdited(false);
     setModal('nuevo');
@@ -140,6 +153,21 @@ export default function TablaInventario() {
     });
     setEditTarget(p);
     setSkuEdited(true);
+
+    const priceVal = p.precioUSD;
+    if (priceVal.startsWith('BS:')) {
+      const bsVal = priceVal.substring(3);
+      setSeBasaEn('BS');
+      setPrecioBSInput(bsVal);
+      const bsNum = parseFloat(bsVal) || 0;
+      setPrecioUSDInput(tasa > 0 ? (bsNum / tasa).toFixed(4) : '0.0000');
+    } else {
+      setSeBasaEn('USD');
+      setPrecioUSDInput(priceVal);
+      const usdNum = parseFloat(priceVal) || 0;
+      setPrecioBSInput((usdNum * tasa).toFixed(4));
+    }
+
     setModal('editar');
   };
 
@@ -156,19 +184,46 @@ export default function TablaInventario() {
     });
   };
 
+  const handleUSDInput = (e: Event) => {
+    const val = (e.target as HTMLInputElement).value;
+    setPrecioUSDInput(val);
+    const usdNum = parseFloat(val);
+    if (!isNaN(usdNum)) {
+      setPrecioBSInput((usdNum * tasa).toFixed(4));
+    } else {
+      setPrecioBSInput('');
+    }
+  };
+
+  const handleBSInput = (e: Event) => {
+    const val = (e.target as HTMLInputElement).value;
+    setPrecioBSInput(val);
+    const bsNum = parseFloat(val);
+    if (!isNaN(bsNum)) {
+      setPrecioUSDInput(tasa > 0 ? (bsNum / tasa).toFixed(4) : '0.0000');
+    } else {
+      setPrecioUSDInput('');
+    }
+  };
 
   const handleGuardar = async () => {
-    if (!form.nombre.trim() || !form.sku.trim() || !form.precioUSD) {
+    const isUSD = seBasaEn === 'USD';
+    const activePriceInput = isUSD ? precioUSDInput : precioBSInput;
+    if (!form.nombre.trim() || !form.sku.trim() || !activePriceInput) {
       flashMsg('error', 'SKU, nombre y precio son obligatorios.');
       return;
     }
     setGuardando(true);
     try {
+      const finalPrecioUSD = isUSD
+        ? String(parseFloat(precioUSDInput).toFixed(4))
+        : "BS:" + String(parseFloat(precioBSInput).toFixed(4));
+
       const payload = {
         sku: form.sku,
         nombre: form.nombre,
         descripcion: form.descripcion || null,
-        precioUsd: String(parseFloat(form.precioUSD).toFixed(2)),
+        precioUsd: finalPrecioUSD,
         stock: form.stock,
         stockMinimo: form.stockMinimo,
       };
@@ -278,7 +333,23 @@ export default function TablaInventario() {
                 <tr key={p.id} class={!p.activo ? 'row-inactivo' : ''}>
                   <td class="td-sku">{p.sku}</td>
                   <td class="td-nombre">{p.nombre}</td>
-                  <td class="td-precio">${parseFloat(p.precioUSD).toFixed(2)}</td>
+                  <td class="td-precio">
+                    {p.precioUSD.startsWith('BS:') ? (
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>{parseFloat(p.precioUSD.substring(3)).toFixed(2)} Bs</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text2)', fontWeight: 'normal' }}>
+                          ~ ${(tasa > 0 ? parseFloat(p.precioUSD.substring(3)) / tasa : 0).toFixed(2)} USD
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>${parseFloat(p.precioUSD).toFixed(2)} USD</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text2)', fontWeight: 'normal' }}>
+                          ~ {(parseFloat(p.precioUSD) * tasa).toFixed(2)} Bs
+                        </div>
+                      </div>
+                    )}
+                  </td>
                   <td class={`td-stock ${p.stock <= p.stockMinimo ? 'stock-critico' : ''}`}>
                     {p.stock <= p.stockMinimo && '⚠️ '}{p.stock}
                   </td>
@@ -340,9 +411,31 @@ export default function TablaInventario() {
                     placeholder="EJ-001"
                   />
                 </div>
-                <div class="form-group">
-                  <label for="f-precio">Precio USD *</label>
-                  <input id="f-precio" type="number" min="0" step="0.01" value={form.precioUSD} onInput={(e) => setField('precioUSD', (e.target as HTMLInputElement).value)} placeholder="0.00" />
+                <div class="form-row-nested" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div class="form-group">
+                    <label for="f-precio">Precio USD *</label>
+                    <input
+                      id="f-precio"
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={precioUSDInput}
+                      onInput={handleUSDInput}
+                      placeholder="0.0000"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="f-precio-bs">Precio Bs *</label>
+                    <input
+                      id="f-precio-bs"
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={precioBSInput}
+                      onInput={handleBSInput}
+                      placeholder="0.0000"
+                    />
+                  </div>
                 </div>
               </div>
               <div class="form-group">
@@ -361,6 +454,32 @@ export default function TablaInventario() {
                 <div class="form-group">
                   <label for="f-stock-min">Stock mínimo</label>
                   <input id="f-stock-min" type="number" min="0" value={form.stockMinimo} onInput={(e) => setField('stockMinimo', parseInt((e.target as HTMLInputElement).value) || 0)} />
+                </div>
+              </div>
+
+              <div class="form-group price-basis-group" style={{ marginTop: '0.5rem', marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text2)', display: 'block', marginBottom: '0.4rem' }}>
+                  El precio del producto se basa en:
+                </span>
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={seBasaEn === 'BS'}
+                      onChange={() => setSeBasaEn('BS')}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
+                    />
+                    Bs (Bolívares)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={seBasaEn === 'USD'}
+                      onChange={() => setSeBasaEn('USD')}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
+                    />
+                    $ (Dólares)
+                  </label>
                 </div>
               </div>
             </div>

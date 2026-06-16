@@ -225,6 +225,9 @@ body {
   width: min(520px, 94vw);
   box-shadow: 0 24px 64px rgba(0,0,0,0.5);
 }
+.modal-card.inv-modal {
+  width: min(640px, 94vw);
+}
 .inv-modal { animation: slideUp 0.22s ease; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; } }
 
@@ -266,6 +269,7 @@ body {
   opacity: 0.85;
 }
 .form-group input {
+  width: 100%;
   background: var(--bg3); border: 1px solid var(--border);
   border-radius: 8px; color: var(--text);
   font-size: 0.9rem; padding: 0.5rem 0.75rem; outline: none;
