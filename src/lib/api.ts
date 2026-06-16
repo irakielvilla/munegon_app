@@ -171,6 +171,18 @@ export const api = {
     throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
   },
 
+  pagar_deudas_productos: async (payload: {
+    usuarioId: string;
+    formaPago: string;
+    moneda: string;
+    referenciaPago?: string;
+    tasaCambio?: string;
+    lineasAPagar: { deudaId: string; lineaId: string }[];
+  }): Promise<string> => {
+    if (isTauri()) return invokeTauri<string>('pagar_deudas_productos', { payload });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
   // ── USUARIOS ──
   listar_usuarios: async (): Promise<Usuario[]> => {
     if (isTauri()) return invokeTauri<Usuario[]>('listar_usuarios');

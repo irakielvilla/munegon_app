@@ -1090,3 +1090,178 @@ pub fn listar_deudas_cliente(cliente_id: String) -> Result<Vec<DeudaInfo>, Strin
 
     Ok(resultado)
 }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PagarDeudaLinea {
+    pub deuda_id: String,
+    pub linea_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PagarDeudasProductosInput {
+    pub usuario_id: String,
+    pub forma_pago: String,
+    pub moneda: String,
+    pub referencia_pago: Option<String>,
+    pub tasa_cambio: Option<String>,
+    pub lineas_a_pagar: Vec<PagarDeudaLinea>,
+}
+
+#[tauri::command]
+pub fn pagar_deudas_productos(
+    payload: PagarDeudasProductosInput,
+) -> Result<String, String> {
+    let mut conn = open_db().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    let mut subtotal_venta: f64 = 0.0;
+    let mut impuesto_venta: f64 = 0.0;
+    let mut lineas_venta_info = Vec::new();
+
+    // 1. Obtener detalles de cada línea de deuda y calcular impuestos proporcionales
+    for item in &payload.lineas_a_pagar {
+        // Consultar la deuda para obtener el ratio de impuesto original
+        let (orig_subtotal_str, orig_impuesto_str): (String, String) = tx
+            .query_row(
+                "SELECT subtotal, impuesto FROM Deuda WHERE id = ?1",
+                params![item.deuda_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|e| format!("Deuda {} no encontrada: {}", item.deuda_id, e))?;
+
+        let orig_subtotal: f64 = orig_subtotal_str.parse().unwrap_or(1.0);
+        let orig_impuesto: f64 = orig_impuesto_str.parse().unwrap_or(0.0);
+        let ratio_impuesto = if orig_subtotal > 0.0 { orig_impuesto / orig_subtotal } else { 0.0 };
+
+        // Consultar la línea de deuda
+        let (producto_id, cantidad, precio_unit, subtotal_linea_str): (String, i64, String, String) = tx
+            .query_row(
+                "SELECT productoId, cantidad, precioUnit, subtotal FROM LineaDeuda WHERE id = ?1",
+                params![item.linea_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .map_err(|e| format!("Línea de deuda {} no encontrada: {}", item.linea_id, e))?;
+
+        let subtotal_linea: f64 = subtotal_linea_str.parse().unwrap_or(0.0);
+        let impuesto_linea = subtotal_linea * ratio_impuesto;
+
+        subtotal_venta += subtotal_linea;
+        impuesto_venta += impuesto_linea;
+
+        lineas_venta_info.push((producto_id, cantidad, precio_unit, subtotal_linea_str));
+    }
+
+    let total_venta = subtotal_venta + impuesto_venta;
+
+    // 2. Registrar la venta en la base de datos
+    let venta_id = Uuid::new_v4().to_string();
+    tx.execute(
+        "INSERT INTO Venta (id, usuarioId, subtotal, impuesto, total, formaPago, moneda, referenciaPago, tasaCambio, isSynced, creadoEn)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, datetime('now'))",
+        params![
+            venta_id,
+            payload.usuario_id,
+            format!("{:.2}", subtotal_venta),
+            format!("{:.2}", impuesto_venta),
+            format!("{:.2}", total_venta),
+            payload.forma_pago,
+            payload.moneda,
+            payload.referencia_pago,
+            payload.tasa_cambio,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // 3. Crear las líneas de venta correspondientes (sin descontar stock)
+    for (producto_id, cantidad, precio_unit, subtotal_linea) in &lineas_venta_info {
+        let linea_id = Uuid::new_v4().to_string();
+        tx.execute(
+            "INSERT INTO LineaVenta (id, ventaId, productoId, cantidad, precioUnit, subtotal)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                linea_id,
+                venta_id,
+                producto_id,
+                cantidad,
+                precio_unit,
+                subtotal_linea,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    // 4. Eliminar las líneas de deuda seleccionadas
+    for item in &payload.lineas_a_pagar {
+        tx.execute("DELETE FROM LineaDeuda WHERE id = ?1", params![item.linea_id])
+            .map_err(|e| e.to_string())?;
+    }
+
+    // 5. Agrupar las líneas pagadas por deuda_id para actualizar/eliminar las deudas padre
+    let mut deudas_afectadas = std::collections::HashSet::new();
+    for item in &payload.lineas_a_pagar {
+        deudas_afectadas.insert(&item.deuda_id);
+    }
+
+    for deuda_id in deudas_afectadas {
+        // Verificar si quedan líneas de deuda
+        let remaining_count: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM LineaDeuda WHERE deudaId = ?1",
+                params![deuda_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        if remaining_count == 0 {
+            // Si ya no quedan productos, eliminar la deuda por completo
+            tx.execute("DELETE FROM Deuda WHERE id = ?1", params![deuda_id])
+                .map_err(|e| e.to_string())?;
+        } else {
+            // Obtener el ratio de impuesto original nuevamente para esta deuda
+            let (orig_subtotal_str, orig_impuesto_str): (String, String) = tx
+                .query_row(
+                    "SELECT subtotal, impuesto FROM Deuda WHERE id = ?1",
+                    params![deuda_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .map_err(|e| e.to_string())?;
+
+            let orig_subtotal: f64 = orig_subtotal_str.parse().unwrap_or(1.0);
+            let orig_impuesto: f64 = orig_impuesto_str.parse().unwrap_or(0.0);
+            let ratio_impuesto = if orig_subtotal > 0.0 { orig_impuesto / orig_subtotal } else { 0.0 };
+
+            // Recalcular el nuevo subtotal de la deuda
+            let remaining_subtotal_str: String = tx
+                .query_row(
+                    "SELECT COALESCE(SUM(CAST(subtotal AS REAL)), 0.0) FROM LineaDeuda WHERE deudaId = ?1",
+                    params![deuda_id],
+                    |row| {
+                        let val: f64 = row.get(0)?;
+                        Ok(format!("{:.2}", val))
+                    },
+                )
+                .map_err(|e| e.to_string())?;
+
+            let remaining_subtotal: f64 = remaining_subtotal_str.parse().unwrap_or(0.0);
+            let remaining_impuesto = remaining_subtotal * ratio_impuesto;
+            let remaining_total = remaining_subtotal + remaining_impuesto;
+
+            tx.execute(
+                "UPDATE Deuda SET subtotal = ?2, impuesto = ?3, total = ?4, isSynced = 0 WHERE id = ?1",
+                params![
+                    deuda_id,
+                    format!("{:.2}", remaining_subtotal),
+                    format!("{:.2}", remaining_impuesto),
+                    format!("{:.2}", remaining_total),
+                ],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(venta_id)
+}
+

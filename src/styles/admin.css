@@ -702,6 +702,7 @@ body {
   border-radius: 10px;
   overflow: hidden;
   background: var(--bg3);
+  flex-shrink: 0;
 }
 
 .deuda-session-header {
@@ -751,4 +752,129 @@ body {
 
 .deuda-items-table tr:last-child td {
   border-bottom: none;
+}
+
+/* ── Estilos de Cobro Parcial de Deuda ── */
+
+.btn-cobrar-deuda-trigger {
+  background: linear-gradient(135deg, var(--accent2), #3d9e6a);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 14px rgba(76, 175, 130, 0.25);
+  white-space: nowrap;
+}
+
+.btn-cobrar-deuda-trigger:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(76, 175, 130, 0.35);
+}
+
+.btn-cobrar-deuda-trigger.cancelar {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.btn-cobrar-deuda-trigger.cancelar:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.deuda-cobro-main-footer {
+  margin-top: auto;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.22s ease;
+}
+
+.deuda-cobro-main-totales {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.deuda-cobro-main-totales-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.deuda-cobro-main-totales-item span {
+  font-size: 0.72rem;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.deuda-cobro-main-totales-item strong {
+  font-size: 1.15rem;
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.deuda-cobro-main-totales-item .total-bs {
+  font-size: 0.78rem;
+  color: var(--text2);
+}
+
+.deuda-cobro-main-acciones {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-cancelar-cobro-main {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text2);
+  padding: 0.55rem 1rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-cancelar-cobro-main:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn-confirmar-cobro-main {
+  background: linear-gradient(135deg, var(--accent), #4f45d4);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 14px rgba(108, 99, 255, 0.25);
+}
+
+.btn-confirmar-cobro-main:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(108, 99, 255, 0.35);
+}
+
+.btn-confirmar-cobro-main:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
 }

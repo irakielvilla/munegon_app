@@ -262,58 +262,71 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
 
   return (
     <ModalOverlay>
-      <div class="modal-card">
-        <div class="modal-header">
-          <h2>💳 Procesar Pago</h2>
-          <button class="modal-close" onClick={onCerrar}>✕</button>
-        </div>
-
-        <div class="modal-totales">
-          <div class="monto-bs">
-            <span>Total</span>
-            <strong>Bs {fmtBs(totalBs)}</strong>
+      <div class="modal-flex-layout">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h2>💳 Procesar Pago</h2>
+            <button class="modal-close" onClick={onCerrar}>✕</button>
           </div>
-          <div class="monto-usd">
-            <span>Equivalente</span>
-            <strong>${fmt2(totalUSD)} USD</strong>
-          </div>
-        </div>
 
-        <p class="modal-section-label">Forma de pago</p>
-        <div class="forma-pago-grid">
-          {formas.map((f) => (
+          <div class="modal-totales">
+            <div class="monto-bs">
+              <span>Total</span>
+              <strong>Bs {fmtBs(totalBs)}</strong>
+            </div>
+            <div class="monto-usd">
+              <span>Equivalente</span>
+              <strong>${fmt2(totalUSD)} USD</strong>
+            </div>
+          </div>
+
+          <p class="modal-section-label">Forma de pago</p>
+          <div class="forma-pago-grid">
+            {formas.map((f) => (
+              <button
+                key={f.key}
+                id={`forma-${f.key.toLowerCase()}`}
+                class={`forma-btn ${forma === f.key ? 'activa' : ''}`}
+                onClick={() => setForma(f.key)}
+              >
+                <span class="forma-icon">{f.icon}</span>
+                <span class="forma-label">{f.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {forma === 'BS_PAGO_MOVIL' && (
+            <div class="referencia-group">
+              <label for="referencia-input">Nº de referencia *</label>
+              <input
+                id="referencia-input"
+                type="text"
+                placeholder="Últimos 4 dígitos"
+                value={referencia}
+                onInput={(e) => {
+                  const rawVal = (e.target as HTMLInputElement).value;
+                  const numericVal = rawVal.replace(/\D/g, '').slice(0, 4);
+                  setReferencia(numericVal);
+                }}
+                maxLength={4}
+              />
+            </div>
+          )}
+
+          <div class="modal-actions">
+            <button class="btn-cancelar" onClick={onCerrar}>Cancelar</button>
             <button
-              key={f.key}
-              id={`forma-${f.key.toLowerCase()}`}
-              class={`forma-btn ${forma === f.key ? 'activa' : ''}`}
-              onClick={() => setForma(f.key)}
+              id="confirmar-pago"
+              class={`btn-confirmar ${forma === 'CUENTA_COBRAR' ? 'btn-confirmar--credito' : ''}`}
+              onClick={handleConfirmar}
             >
-              <span class="forma-icon">{f.icon}</span>
-              <span class="forma-label">{f.label}</span>
+              {forma === 'CUENTA_COBRAR' ? '💾 Guardar Deuda' : '✅ Confirmar Pago'}
             </button>
-          ))}
-        </div>
-
-        {forma === 'BS_PAGO_MOVIL' && (
-          <div class="referencia-group">
-            <label for="referencia-input">Nº de referencia *</label>
-            <input
-              id="referencia-input"
-              type="text"
-              placeholder="Últimos 4 dígitos"
-              value={referencia}
-              onInput={(e) => {
-                const rawVal = (e.target as HTMLInputElement).value;
-                const numericVal = rawVal.replace(/\D/g, '').slice(0, 4);
-                setReferencia(numericVal);
-              }}
-              maxLength={4}
-            />
           </div>
-        )}
+        </div>
 
         {forma === 'CUENTA_COBRAR' && (
-          <div class="cliente-cobrar-section">
+          <div class="cliente-cobrar-lateral">
             {!creandoCliente ? (
               <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <label for="cliente-select" style={{ fontSize: '0.78rem', color: 'var(--text2)' }}>Seleccionar Cliente *</label>
@@ -357,9 +370,9 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
                       id="nuevo-nombre"
                       type="text"
                       value={nuevoNombre}
-                      onInput={(e) => setNuevoNombre((e.target as HTMLInputElement).value)}
-                      placeholder="Ej. Daniel"
-                      style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                      onInput={(e) => setNuevoNombre((e.target as HTMLInputElement).value.toUpperCase())}
+                      placeholder="Ej. DANIEL"
+                      style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none', textTransform: 'uppercase' }}
                     />
                   </div>
                   <div class="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
@@ -368,9 +381,9 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
                       id="nuevo-apellido"
                       type="text"
                       value={nuevoApellido}
-                      onInput={(e) => setNuevoApellido((e.target as HTMLInputElement).value)}
-                      placeholder="Ej. Trejo"
-                      style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                      onInput={(e) => setNuevoApellido((e.target as HTMLInputElement).value.toUpperCase())}
+                      placeholder="Ej. TREJO"
+                      style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none', textTransform: 'uppercase' }}
                     />
                   </div>
                 </div>
@@ -382,7 +395,7 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
                     value={nuevoTelefono}
                     onInput={(e) => setNuevoTelefono((e.target as HTMLInputElement).value)}
                     placeholder="Ej. 04121234567"
-                    style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                    style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
                   />
                 </div>
                 <div class="nuevo-cliente-actions">
@@ -405,13 +418,6 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
             )}
           </div>
         )}
-
-        <div class="modal-actions">
-          <button class="btn-cancelar" onClick={onCerrar}>Cancelar</button>
-          <button id="confirmar-pago" class="btn-confirmar" onClick={handleConfirmar}>
-            ✅ Confirmar Pago
-          </button>
-        </div>
       </div>
     </ModalOverlay>
   );

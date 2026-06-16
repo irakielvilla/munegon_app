@@ -692,6 +692,11 @@ body {
   width: min(480px, 94vw);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   animation: slideUp 0.25s ease;
+  transition: width 0.2s ease;
+}
+
+.modal-card.modal-card--wide {
+  width: min(540px, 94vw);
 }
 
 @keyframes slideUp {
@@ -871,11 +876,16 @@ body {
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 700;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, background 0.2s;
 }
 
 .btn-confirmar:hover {
   opacity: 0.9;
+}
+
+.btn-confirmar.btn-confirmar--credito {
+  background: linear-gradient(135deg, var(--warn), #c47f00);
+  color: #fff;
 }
 
 /* ── Modal Corte X — Rediseñado ─────────────────────────────── */
@@ -1233,4 +1243,63 @@ body {
 
 .btn-guardar-mini:hover {
   opacity: 0.9;
+}
+
+/* ── Panel Lateral "A Crédito" y Layout Flex en Modal ── */
+
+.modal-flex-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1.5rem;
+  max-width: 96vw;
+  max-height: 96vh;
+}
+
+.cliente-cobrar-lateral {
+  background: linear-gradient(0deg, rgba(76, 175, 130, 0.1), rgba(76, 175, 130, 0.1)), var(--bg2);
+  border: 1px solid var(--accent2);
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: min(380px, 90vw);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  animation: slideRight 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: absolute;
+  left: calc(50% + 240px + 1.5rem);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translate(-10px, -50%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+@media (max-width: 1300px) {
+  .modal-flex-layout {
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+  }
+  .cliente-cobrar-lateral {
+    position: static;
+    transform: none;
+    align-self: center;
+    animation: fadeIn 0.2s ease;
+  }
+}
+
+/* Alineación de opción A Crédito a la derecha de la cuadrícula */
+#forma-cuenta_cobrar {
+  grid-column: 2;
 }
