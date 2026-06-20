@@ -102,6 +102,10 @@ pub fn run() {
             commands::ventas::crear_deuda,
             commands::ventas::listar_deudas_cliente,
             commands::ventas::pagar_deudas_productos,
+            commands::ventas::eliminar_cliente,
+            commands::ventas::eliminar_deuda,
+            commands::ventas::eliminar_linea_deuda,
+            commands::ventas::actualizar_cantidad_linea_deuda,
         ])
         .run(tauri::generate_context!())
         .expect("Error al iniciar Muñegon POS");

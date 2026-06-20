@@ -184,6 +184,26 @@ export const api = {
     throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
   },
 
+  eliminar_cliente: async (clienteId: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('eliminar_cliente', { clienteId });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  eliminar_deuda: async (deudaId: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('eliminar_deuda', { deudaId });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  eliminar_linea_deuda: async (deudaId: string, lineaId: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('eliminar_linea_deuda', { deudaId, lineaId });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  actualizar_cantidad_linea_deuda: async (deudaId: string, lineaId: string, nuevaCantidad: number): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('actualizar_cantidad_linea_deuda', { deudaId, lineaId, nuevaCantidad });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
   // ── USUARIOS ──
   listar_usuarios: async (): Promise<Usuario[]> => {
     if (isTauri()) return invokeTauri<Usuario[]>('listar_usuarios');

@@ -178,6 +178,7 @@ model Deuda {
   subtotal    String
   impuesto    String
   total       String
+  activo      Boolean  @default(true)
   creadoEn    DateTime @default(now())
   isSynced    Boolean  @default(false)
 
@@ -193,5 +194,6 @@ model LineaDeuda {
   cantidad   Int
   precioUnit String
   subtotal   String
+  activo     Boolean  @default(true)
 }
 

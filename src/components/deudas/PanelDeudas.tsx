@@ -151,6 +151,87 @@ const formatFecha = (isoStr: string) => {
   }
 };
 
+interface ModalClienteProps {
+  onConfirmar: (nombre: string, apellido: string, telefono?: string) => Promise<void>;
+  onCerrar: () => void;
+}
+
+function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevoApellido, setNuevoApellido] = useState('');
+  const [nuevoTelefono, setNuevoTelefono] = useState('');
+  const [procesando, setProcesando] = useState(false);
+
+  const guardar = async () => {
+    if (!nuevoNombre.trim() || !nuevoApellido.trim()) {
+      alert('Nombre y apellido son obligatorios.');
+      return;
+    }
+    setProcesando(true);
+    try {
+      await onConfirmar(nuevoNombre.trim(), nuevoApellido.trim(), nuevoTelefono.trim() || undefined);
+      onCerrar();
+    } catch(e) {
+      alert(`Error creando cliente: ${e}`);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  return (
+    <ModalOverlay>
+      <div class="modal-card" style={{ maxWidth: '400px' }}>
+        <div class="modal-header">
+          <h2>➕ Registrar Nuevo Cliente</h2>
+          <button class="modal-close" onClick={onCerrar}>✕</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+          <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <label for="nuevo-nombre" style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Nombre *</label>
+            <input
+              id="nuevo-nombre"
+              type="text"
+              value={nuevoNombre}
+              onInput={(e) => setNuevoNombre((e.target as HTMLInputElement).value.toUpperCase())}
+              placeholder="Ej. DANIEL"
+              style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.6rem', fontSize: '0.95rem', outline: 'none', textTransform: 'uppercase' }}
+              autoFocus
+            />
+          </div>
+          <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <label for="nuevo-apellido" style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Apellido *</label>
+            <input
+              id="nuevo-apellido"
+              type="text"
+              value={nuevoApellido}
+              onInput={(e) => setNuevoApellido((e.target as HTMLInputElement).value.toUpperCase())}
+              placeholder="Ej. TREJO"
+              style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.6rem', fontSize: '0.95rem', outline: 'none', textTransform: 'uppercase' }}
+            />
+          </div>
+          <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <label for="nuevo-telefono" style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Teléfono (Opcional)</label>
+            <input
+              id="nuevo-telefono"
+              type="text"
+              value={nuevoTelefono}
+              onInput={(e) => setNuevoTelefono((e.target as HTMLInputElement).value)}
+              placeholder="Ej. 04121234567"
+              style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.6rem', fontSize: '0.95rem', outline: 'none' }}
+            />
+          </div>
+        </div>
+        <div class="modal-actions" style={{ marginTop: '1.5rem' }}>
+          <button class="btn-cancelar" onClick={onCerrar}>Cancelar</button>
+          <button class="btn-confirmar" onClick={guardar} disabled={procesando}>
+            {procesando ? 'Guardando...' : '💾 Guardar Cliente'}
+          </button>
+        </div>
+      </div>
+    </ModalOverlay>
+  );
+}
+
 export default function PanelDeudas() {
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [totalesCliente, setTotalesCliente] = useState<Record<string, number>>({});
@@ -165,6 +246,73 @@ export default function PanelDeudas() {
   const [lineasSeleccionadas, setLineasSeleccionadas] = useState<Record<string, { deudaId: string; subtotal: number; impuesto: number }>>({});
   const [modalPagoOpen, setModalPagoOpen] = useState(false);
   const [procesando, setProcesando] = useState(false);
+  
+  // Estados de edición y gestión
+  const [modoEdicionActivo, setModoEdicionActivo] = useState(false);
+  const [creandoCliente, setCreandoCliente] = useState(false);
+
+  const handleCrearCliente = async (nombre: string, apellido: string, telefono?: string) => {
+    const id = await api.crear_cliente(nombre, apellido, telefono);
+    alert('Cliente creado exitosamente');
+    cargarClientes();
+    // Auto seleccionar el nuevo cliente
+    const info = { id, nombre, apellido, telefono: telefono || null, activo: true };
+    seleccionarCliente(info);
+  };
+
+  const handleBorrarCliente = async () => {
+    if (!clienteSeleccionado) return;
+    const total = totalesCliente[clienteSeleccionado.id] || 0;
+    if (total > 0) {
+      alert('⚠️ No se puede borrar este cliente porque tiene deudas pendientes.');
+      return;
+    }
+    if (confirm(`¿Estás seguro de borrar a ${clienteSeleccionado.nombre} ${clienteSeleccionado.apellido}?`)) {
+      try {
+        await api.eliminar_cliente(clienteSeleccionado.id);
+        setClienteSeleccionado(null);
+        setDeudas([]);
+        cargarClientes();
+      } catch (e) {
+        alert(String(e));
+      }
+    }
+  };
+
+  const handleEliminarDeuda = async (deudaId: string) => {
+    if (confirm('⚠️ ¿Estás seguro de eliminar esta compra completa? Todos los productos regresarán al inventario.')) {
+      try {
+        await api.eliminar_deuda(deudaId);
+        seleccionarCliente(clienteSeleccionado!);
+        cargarClientes();
+      } catch (e) {
+        alert(String(e));
+      }
+    }
+  };
+
+  const handleEliminarLinea = async (deudaId: string, lineaId: string) => {
+    if (confirm('¿Eliminar este producto de la deuda? Volverá al inventario.')) {
+      try {
+        await api.eliminar_linea_deuda(deudaId, lineaId);
+        seleccionarCliente(clienteSeleccionado!);
+        cargarClientes();
+      } catch (e) {
+        alert(String(e));
+      }
+    }
+  };
+
+  const handleCambiarCantidadLinea = async (deudaId: string, lineaId: string, nuevaCantidad: number) => {
+    if (nuevaCantidad < 1) return;
+    try {
+      await api.actualizar_cantidad_linea_deuda(deudaId, lineaId, nuevaCantidad);
+      seleccionarCliente(clienteSeleccionado!);
+      cargarClientes();
+    } catch (e) {
+      alert(String(e));
+    }
+  };
 
   useEffect(() => {
     cargarClientes();
@@ -337,6 +485,25 @@ export default function PanelDeudas() {
             })
           )}
         </div>
+        <div style={{ padding: '1rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-surface)', marginTop: 'auto' }}>
+          <button
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--text-on-accent)', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
+            onClick={() => setCreandoCliente(true)}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+          >
+            ➕ Agregar Cliente
+          </button>
+          <button
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontWeight: '600', cursor: clienteSeleccionado ? 'pointer' : 'not-allowed', opacity: clienteSeleccionado ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
+            disabled={!clienteSeleccionado}
+            onClick={handleBorrarCliente}
+            onMouseEnter={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'var(--danger)', e.currentTarget.style.color = 'var(--bg-base)')}
+            onMouseLeave={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--danger)')}
+          >
+            🗑️ Borrar Cliente
+          </button>
+        </div>
       </aside>
 
       {/* Pane central: Detalle de deudas del cliente seleccionado */}
@@ -364,19 +531,32 @@ export default function PanelDeudas() {
                   <strong>${fmtBs(totalAcumulado)} USD</strong>
                 </div>
                 {deudas.length > 0 && (
-                  <button
-                    class={`btn-cobrar-deuda-trigger ${modoCobroActivo ? 'cancelar' : ''}`}
-                    onClick={() => {
-                      if (modoCobroActivo) {
-                        setModoCobroActivo(false);
-                        setLineasSeleccionadas({});
-                      } else {
-                        setModoCobroActivo(true);
-                      }
-                    }}
-                  >
-                    {modoCobroActivo ? '❌ Cancelar Cobro' : 'Cobrar Deuda'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <button
+                      class={`btn-cobrar-deuda-trigger ${modoEdicionActivo ? 'cancelar' : ''}`}
+                      onClick={() => {
+                        setModoEdicionActivo(!modoEdicionActivo);
+                        if (!modoEdicionActivo) setModoCobroActivo(false);
+                      }}
+                      style={modoEdicionActivo ? undefined : { background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                    >
+                      {modoEdicionActivo ? '❌ Terminar Edición' : '✏️ Editar Deuda'}
+                    </button>
+                    <button
+                      class={`btn-cobrar-deuda-trigger ${modoCobroActivo ? 'cancelar' : ''}`}
+                      onClick={() => {
+                        if (modoCobroActivo) {
+                          setModoCobroActivo(false);
+                          setLineasSeleccionadas({});
+                        } else {
+                          setModoCobroActivo(true);
+                          setModoEdicionActivo(false);
+                        }
+                      }}
+                    >
+                      {modoCobroActivo ? '❌ Cancelar Cobro' : 'Cobrar Deuda'}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -400,9 +580,20 @@ export default function PanelDeudas() {
                         <span class="deuda-session-date">
                           📅 Compra: {formatFecha(d.creadoEn)}
                         </span>
-                        <span class="deuda-session-total">
-                          Total compra: ${fmtBs(parseFloat(d.total))} USD
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <span class="deuda-session-total">
+                            Total compra: ${fmtBs(parseFloat(d.total))} USD
+                          </span>
+                          {modoEdicionActivo && (
+                            <button
+                              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '1.2rem', padding: '0 0.5rem' }}
+                              onClick={() => handleEliminarDeuda(d.id)}
+                              title="Eliminar compra completa"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {/* Detalle de productos llevados ese día */}
                       <div class="deuda-session-details">
@@ -415,6 +606,7 @@ export default function PanelDeudas() {
                               <th style={{ textAlign: 'right' }}>Precio Unit.</th>
                               <th style={{ textAlign: 'right' }}>Subtotal</th>
                               <th style={{ textAlign: 'right' }}>Subtotal en Bs</th>
+                              {modoEdicionActivo && <th style={{ width: '60px', textAlign: 'center' }}></th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -431,10 +623,37 @@ export default function PanelDeudas() {
                                   </td>
                                 )}
                                 <td>{linea.productoNombre}</td>
-                                <td style={{ textAlign: 'center' }}>{linea.cantidad}</td>
+                                <td style={{ textAlign: 'center' }}>
+                                  {modoEdicionActivo ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                                      <button 
+                                        onClick={() => handleCambiarCantidadLinea(d.id, linea.id, linea.cantidad - 1)}
+                                        style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.1rem 0.4rem', cursor: 'pointer', color: 'var(--text)' }}
+                                      >-</button>
+                                      <span style={{ minWidth: '1.5rem', textAlign: 'center' }}>{linea.cantidad}</span>
+                                      <button 
+                                        onClick={() => handleCambiarCantidadLinea(d.id, linea.id, linea.cantidad + 1)}
+                                        style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.1rem 0.4rem', cursor: 'pointer', color: 'var(--text)' }}
+                                      >+</button>
+                                    </div>
+                                  ) : (
+                                    linea.cantidad
+                                  )}
+                                </td>
                                 <td style={{ textAlign: 'right' }}>${fmtBs(parseFloat(linea.precioUnit))}</td>
                                 <td style={{ textAlign: 'right' }}>${fmtBs(parseFloat(linea.subtotal))}</td>
                                 <td style={{ textAlign: 'right' }}>Bs {fmtBs(parseFloat(linea.subtotal) * tasaNum)}</td>
+                                {modoEdicionActivo && (
+                                  <td style={{ textAlign: 'center' }}>
+                                    <button
+                                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem' }}
+                                      onClick={() => handleEliminarLinea(d.id, linea.id)}
+                                      title="Eliminar producto"
+                                    >
+                                      ❌
+                                    </button>
+                                  </td>
+                                )}
                               </tr>
                             ))}
                           </tbody>
@@ -495,6 +714,14 @@ export default function PanelDeudas() {
             tasa={config.tasa_cambio_bsd}
             onConfirmar={procesarPagoDeuda}
             onCerrar={() => setModalPagoOpen(false)}
+          />
+        )}
+
+        {/* Modal Crear Cliente */}
+        {creandoCliente && (
+          <ModalCliente
+            onConfirmar={handleCrearCliente}
+            onCerrar={() => setCreandoCliente(false)}
           />
         )}
       </main>
