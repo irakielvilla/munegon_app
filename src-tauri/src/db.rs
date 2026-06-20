@@ -170,6 +170,43 @@ fn inicializar_tablas(conn: &Connection) -> rusqlite::Result<()> {
              creadoEn TEXT NOT NULL DEFAULT (datetime('now')),
              isSynced INTEGER NOT NULL DEFAULT 0,
              FOREIGN KEY(usuarioId) REFERENCES Usuario(id)
+         );
+
+         CREATE TABLE IF NOT EXISTS Cliente (
+             id TEXT PRIMARY KEY,
+             nombre TEXT NOT NULL,
+             apellido TEXT NOT NULL,
+             telefono TEXT,
+             activo INTEGER NOT NULL DEFAULT 1,
+             creadoEn TEXT NOT NULL DEFAULT (datetime('now')),
+             isSynced INTEGER NOT NULL DEFAULT 0
+         );
+
+         CREATE TABLE IF NOT EXISTS Deuda (
+             id TEXT PRIMARY KEY,
+             clienteId TEXT NOT NULL,
+             usuarioId TEXT NOT NULL,
+             subtotal TEXT NOT NULL,
+             impuesto TEXT NOT NULL,
+             total TEXT NOT NULL,
+             activo INTEGER NOT NULL DEFAULT 1,
+             creadoEn TEXT NOT NULL DEFAULT (datetime('now')),
+             isSynced INTEGER NOT NULL DEFAULT 0,
+             FOREIGN KEY(clienteId) REFERENCES Cliente(id),
+             FOREIGN KEY(usuarioId) REFERENCES Usuario(id)
+         );
+
+         CREATE TABLE IF NOT EXISTS LineaDeuda (
+             id TEXT PRIMARY KEY,
+             deudaId TEXT NOT NULL,
+             productoId TEXT NOT NULL,
+             cantidad INTEGER NOT NULL,
+             precioUnit TEXT NOT NULL,
+             subtotal TEXT NOT NULL,
+             anulada BOOLEAN NOT NULL DEFAULT 0,
+             activo INTEGER NOT NULL DEFAULT 1,
+             FOREIGN KEY(deudaId) REFERENCES Deuda(id) ON DELETE CASCADE,
+             FOREIGN KEY(productoId) REFERENCES Producto(id)
          );"
     )?;
     Ok(())
