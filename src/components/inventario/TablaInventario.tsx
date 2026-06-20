@@ -319,7 +319,7 @@ export default function TablaInventario() {
             <tr>
               <th>SKU</th>
               <th>Nombre</th>
-              <th>Precio USD</th>
+              <th>Precio</th>
               <th>Stock</th>
               <th>Mín.</th>
               <th>Estado</th>

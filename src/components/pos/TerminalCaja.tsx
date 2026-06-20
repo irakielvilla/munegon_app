@@ -750,8 +750,8 @@ export default function TerminalCaja() {
                           </>
                         ) : (
                           <>
-                            <span class="prod-precio">Bs {fmtBs((parseFloat(p.precio) || 0) * tasaNum)}</span>
-                            <span class="prod-precio-usd">${(parseFloat(p.precio) || 0).toFixed(2)} USD</span>
+                            <span class="prod-precio">${(parseFloat(p.precio) || 0).toFixed(2)} USD</span>
+                            <span class="prod-precio-usd">~ Bs {fmtBs((parseFloat(p.precio) || 0) * tasaNum)}</span>
                           </>
                         )}
                       </div>
