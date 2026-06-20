@@ -1165,8 +1165,8 @@ pub fn pagar_deudas_productos(
     // 2. Registrar la venta en la base de datos
     let venta_id = Uuid::new_v4().to_string();
     tx.execute(
-        "INSERT INTO Venta (id, usuarioId, subtotal, impuesto, total, formaPago, moneda, referenciaPago, tasaCambio, isSynced, creadoEn)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, datetime('now'))",
+        "INSERT INTO Venta (id, usuarioId, subtotal, impuesto, total, formaPago, moneda, referenciaPago, tasaCambio, isSynced, esCobroDeuda, creadoEn)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, 1, datetime('now'))",
         params![
             venta_id,
             payload.usuario_id,
@@ -1201,7 +1201,7 @@ pub fn pagar_deudas_productos(
 
     // 4. Eliminar las líneas de deuda seleccionadas
     for item in &payload.lineas_a_pagar {
-        tx.execute("DELETE FROM LineaDeuda WHERE id = ?1", params![item.linea_id])
+        tx.execute("UPDATE LineaDeuda SET activo = 0 WHERE id = ?1", params![item.linea_id])
             .map_err(|e| e.to_string())?;
     }
 
@@ -1215,7 +1215,7 @@ pub fn pagar_deudas_productos(
         // Verificar si quedan líneas de deuda
         let remaining_count: i64 = tx
             .query_row(
-                "SELECT COUNT(*) FROM LineaDeuda WHERE deudaId = ?1",
+                "SELECT COUNT(*) FROM LineaDeuda WHERE deudaId = ?1 AND activo = 1",
                 params![deuda_id],
                 |row| row.get(0),
             )
@@ -1223,7 +1223,7 @@ pub fn pagar_deudas_productos(
 
         if remaining_count == 0 {
             // Si ya no quedan productos, eliminar la deuda por completo
-            tx.execute("DELETE FROM Deuda WHERE id = ?1", params![deuda_id])
+            tx.execute("UPDATE Deuda SET activo = 0, isSynced = 0 WHERE id = ?1", params![deuda_id])
                 .map_err(|e| e.to_string())?;
         } else {
             // Obtener el ratio de impuesto original nuevamente para esta deuda
@@ -1242,7 +1242,7 @@ pub fn pagar_deudas_productos(
             // Recalcular el nuevo subtotal de la deuda
             let remaining_subtotal_str: String = tx
                 .query_row(
-                    "SELECT COALESCE(SUM(CAST(subtotal AS REAL)), 0.0) FROM LineaDeuda WHERE deudaId = ?1",
+                    "SELECT COALESCE(SUM(CAST(subtotal AS REAL)), 0.0) FROM LineaDeuda WHERE deudaId = ?1 AND activo = 1",
                     params![deuda_id],
                     |row| {
                         let val: f64 = row.get(0)?;
@@ -1320,7 +1320,7 @@ pub fn eliminar_deuda(deuda_id: String) -> Result<(), String> {
     }
 
     tx.execute("UPDATE LineaDeuda SET activo = false WHERE deudaId = ?1", rusqlite::params![deuda_id]).map_err(|e| e.to_string())?;
-    tx.execute("UPDATE Deuda SET activo = false, isSynced = 0 WHERE id = ?1", rusqlite::params![deuda_id]).map_err(|e| e.to_string())?;
+    tx.execute("UPDATE Deuda SET activo = false, anulada = true, isSynced = 0 WHERE id = ?1", rusqlite::params![deuda_id]).map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
@@ -1430,4 +1430,94 @@ pub fn actualizar_cantidad_linea_deuda(deuda_id: String, linea_id: String, nueva
 
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// ── Sincronización: Cuentas por Cobrar ───────────────────────
+
+#[tauri::command]
+pub fn obtener_clientes_pendientes() -> Result<Vec<serde_json::Value>, String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, nombre, apellido, telefono, activo, creadoEn FROM Cliente WHERE isSynced = 0")
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "nombre": row.get::<_, String>(1)?,
+                "apellido": row.get::<_, String>(2)?,
+                "telefono": row.get::<_, Option<String>>(3)?,
+                "activo": row.get::<_, i32>(4)? == 1,
+                "creadoEn": row.get::<_, String>(5)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut clientes = Vec::new();
+    for row in rows {
+        if let Ok(c) = row {
+            clientes.push(c);
+        }
+    }
+    Ok(clientes)
+}
+
+#[tauri::command]
+pub fn obtener_deudas_pendientes() -> Result<Vec<serde_json::Value>, String> {
+    let mut conn = open_db().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, clienteId, usuarioId, subtotal, impuesto, total, activo, anulada, creadoEn FROM Deuda WHERE isSynced = 0")
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "clienteId": row.get::<_, String>(1)?,
+                "usuarioId": row.get::<_, String>(2)?,
+                "subtotal": row.get::<_, String>(3)?,
+                "impuesto": row.get::<_, String>(4)?,
+                "total": row.get::<_, String>(5)?,
+                "activo": row.get::<_, i32>(6)? == 1,
+                "anulada": row.get::<_, i32>(7)? == 1,
+                "creadoEn": row.get::<_, String>(8)?,
+                "lineas": [],
+            }))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut deudas = Vec::new();
+    for row in rows {
+        if let Ok(mut d) = row {
+            let deuda_id = d["id"].as_str().unwrap().to_string();
+            let mut stmt_lineas = conn
+                .prepare("SELECT id, deudaId, productoId, cantidad, precioUnit, subtotal, activo FROM LineaDeuda WHERE deudaId = ?1")
+                .unwrap();
+            let lineas_rows = stmt_lineas
+                .query_map(rusqlite::params![deuda_id], |row| {
+                    Ok(serde_json::json!({
+                        "id": row.get::<_, String>(0)?,
+                        "deudaId": row.get::<_, String>(1)?,
+                        "productoId": row.get::<_, String>(2)?,
+                        "cantidad": row.get::<_, i64>(3)?,
+                        "precioUnit": row.get::<_, String>(4)?,
+                        "subtotal": row.get::<_, String>(5)?,
+                        "activo": row.get::<_, i32>(6)? == 1,
+                    }))
+                })
+                .unwrap();
+
+            let mut lineas_arr = Vec::new();
+            for l_row in lineas_rows {
+                if let Ok(l) = l_row {
+                    lineas_arr.push(l);
+                }
+            }
+
+            d["lineas"] = serde_json::Value::Array(lineas_arr);
+            deudas.push(d);
+        }
+    }
+    Ok(deudas)
 }

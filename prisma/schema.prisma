@@ -78,6 +78,7 @@ model Venta {
   tasaCambio     String? // Snapshot de la tasa BsD al momento de la venta
   creadoEn       DateTime   @default(now())
   isSynced       Boolean    @default(false)
+  esCobroDeuda   Boolean    @default(false)
 
   lineas LineaVenta[]
 }
@@ -179,6 +180,7 @@ model Deuda {
   impuesto    String
   total       String
   activo      Boolean  @default(true)
+  anulada     Boolean  @default(false)
   creadoEn    DateTime @default(now())
   isSynced    Boolean  @default(false)
 
