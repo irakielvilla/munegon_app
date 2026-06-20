@@ -34,7 +34,8 @@ export interface Producto {
   sku: string;
   nombre: string;
   descripcion: string | null;
-  precioUSD: string;
+  monedaBase: 'USD' | 'BS';
+  precio: string;
   stock: number;
   stockMinimo: number;
   activo: boolean;

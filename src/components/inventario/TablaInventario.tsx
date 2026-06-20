@@ -13,7 +13,8 @@ interface Producto {
   sku: string;
   nombre: string;
   descripcion: string | null;
-  precioUSD: string;
+  monedaBase: 'USD' | 'BS';
+  precio: string;
   stock: number;
   stockMinimo: number;
   activo: boolean;
@@ -25,7 +26,8 @@ const emptyProducto = (): Omit<Producto, 'id' | 'activo'> => ({
   sku: '',
   nombre: '',
   descripcion: '',
-  precioUSD: '',
+  monedaBase: 'USD',
+  precio: '',
   stock: 0,
   stockMinimo: 5,
 });
@@ -147,24 +149,23 @@ export default function TablaInventario() {
       sku: p.sku,
       nombre: p.nombre,
       descripcion: p.descripcion ?? '',
-      precioUSD: p.precioUSD,
+      monedaBase: p.monedaBase,
+      precio: p.precio,
       stock: p.stock,
       stockMinimo: p.stockMinimo,
     });
     setEditTarget(p);
     setSkuEdited(true);
 
-    const priceVal = p.precioUSD;
-    if (priceVal.startsWith('BS:')) {
-      const bsVal = priceVal.substring(3);
+    if (p.monedaBase === 'BS') {
       setSeBasaEn('BS');
-      setPrecioBSInput(bsVal);
-      const bsNum = parseFloat(bsVal) || 0;
+      setPrecioBSInput(p.precio);
+      const bsNum = parseFloat(p.precio) || 0;
       setPrecioUSDInput(tasa > 0 ? (bsNum / tasa).toFixed(4) : '0.0000');
     } else {
       setSeBasaEn('USD');
-      setPrecioUSDInput(priceVal);
-      const usdNum = parseFloat(priceVal) || 0;
+      setPrecioUSDInput(p.precio);
+      const usdNum = parseFloat(p.precio) || 0;
       setPrecioBSInput((usdNum * tasa).toFixed(4));
     }
 
@@ -215,15 +216,16 @@ export default function TablaInventario() {
     }
     setGuardando(true);
     try {
-      const finalPrecioUSD = isUSD
-        ? String(parseFloat(precioUSDInput).toFixed(4))
-        : "BS:" + String(parseFloat(precioBSInput).toFixed(4));
+      const finalPrecio = isUSD
+        ? String((parseFloat(precioUSDInput) || 0).toFixed(4))
+        : String((parseFloat(precioBSInput) || 0).toFixed(4));
 
       const payload = {
         sku: form.sku,
         nombre: form.nombre,
         descripcion: form.descripcion || null,
-        precioUsd: finalPrecioUSD,
+        monedaBase: isUSD ? 'USD' : 'BS',
+        precio: finalPrecio,
         stock: form.stock,
         stockMinimo: form.stockMinimo,
       };
@@ -255,7 +257,8 @@ export default function TablaInventario() {
         sku: p.sku,
         nombre: p.nombre,
         descripcion: p.descripcion,
-        precioUsd: p.precioUSD,
+        monedaBase: p.monedaBase,
+        precio: p.precio,
         stock: p.stock,
         stockMinimo: p.stockMinimo,
         activo: !p.activo,
@@ -334,18 +337,18 @@ export default function TablaInventario() {
                   <td class="td-sku">{p.sku}</td>
                   <td class="td-nombre">{p.nombre}</td>
                   <td class="td-precio">
-                    {p.precioUSD.startsWith('BS:') ? (
+                    {p.monedaBase === 'BS' ? (
                       <div>
-                        <div style={{ fontWeight: 'bold' }}>{parseFloat(p.precioUSD.substring(3)).toFixed(2)} Bs</div>
+                        <div style={{ fontWeight: 'bold' }}>{parseFloat(p.precio).toFixed(2)} Bs</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text2)', fontWeight: 'normal' }}>
-                          ~ ${(tasa > 0 ? parseFloat(p.precioUSD.substring(3)) / tasa : 0).toFixed(2)} USD
+                          ~ ${(tasa > 0 ? parseFloat(p.precio) / tasa : 0).toFixed(2)} USD
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <div style={{ fontWeight: 'bold' }}>${parseFloat(p.precioUSD).toFixed(2)} USD</div>
+                        <div style={{ fontWeight: 'bold' }}>${parseFloat(p.precio).toFixed(2)} USD</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text2)', fontWeight: 'normal' }}>
-                          ~ {(parseFloat(p.precioUSD) * tasa).toFixed(2)} Bs
+                          ~ {(parseFloat(p.precio) * tasa).toFixed(2)} Bs
                         </div>
                       </div>
                     )}
@@ -464,7 +467,8 @@ export default function TablaInventario() {
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text)', cursor: 'pointer' }}>
                     <input
-                      type="checkbox"
+                      type="radio"
+                      name="basePrecio"
                       checked={seBasaEn === 'BS'}
                       onChange={() => setSeBasaEn('BS')}
                       style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
@@ -473,7 +477,8 @@ export default function TablaInventario() {
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text)', cursor: 'pointer' }}>
                     <input
-                      type="checkbox"
+                      type="radio"
+                      name="basePrecio"
                       checked={seBasaEn === 'USD'}
                       onChange={() => setSeBasaEn('USD')}
                       style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}

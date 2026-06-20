@@ -14,7 +14,8 @@ interface Producto {
   id: string;
   sku: string;
   nombre: string;
-  precioUSD: string;
+  monedaBase: 'USD' | 'BS';
+  precio: string;
   stock: number;
   activo: boolean;
 }
@@ -67,11 +68,11 @@ const fmt2 = (n: number) => n.toFixed(2);
 const fmtBs = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
 const getProductPriceUSD = (p: Producto, rate: number) => {
-  if (p.precioUSD.startsWith('BS:')) {
-    const bsVal = parseFloat(p.precioUSD.substring(3)) || 0;
+  if (p.monedaBase === 'BS') {
+    const bsVal = parseFloat(p.precio) || 0;
     return bsVal / rate;
   }
-  return parseFloat(p.precioUSD) || 0;
+  return parseFloat(p.precio) || 0;
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -742,15 +743,15 @@ export default function TerminalCaja() {
                     </span>
                     <div class="prod-footer">
                       <div class="prod-precio-container">
-                        {p.precioUSD.startsWith('BS:') ? (
+                        {p.monedaBase === 'BS' ? (
                           <>
-                            <span class="prod-precio">Bs {fmtBs(parseFloat(p.precioUSD.substring(3)) || 0)}</span>
-                            <span class="prod-precio-usd">${((parseFloat(p.precioUSD.substring(3)) || 0) / tasaNum).toFixed(2)} USD</span>
+                            <span class="prod-precio">Bs {fmtBs(parseFloat(p.precio) || 0)}</span>
+                            <span class="prod-precio-usd">${((parseFloat(p.precio) || 0) / tasaNum).toFixed(2)} USD</span>
                           </>
                         ) : (
                           <>
-                            <span class="prod-precio">Bs {fmtBs((parseFloat(p.precioUSD) || 0) * tasaNum)}</span>
-                            <span class="prod-precio-usd">${(parseFloat(p.precioUSD) || 0).toFixed(2)} USD</span>
+                            <span class="prod-precio">Bs {fmtBs((parseFloat(p.precio) || 0) * tasaNum)}</span>
+                            <span class="prod-precio-usd">${(parseFloat(p.precio) || 0).toFixed(2)} USD</span>
                           </>
                         )}
                       </div>

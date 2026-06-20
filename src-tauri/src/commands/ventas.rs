@@ -26,8 +26,9 @@ pub struct Producto {
     pub sku: String,
     pub nombre: String,
     pub descripcion: Option<String>,
-    #[serde(rename = "precioUSD")]
-    pub precio_usd: String,
+    #[serde(rename = "monedaBase")]
+    pub moneda_base: String,
+    pub precio: String,
     pub stock: i64,
     #[serde(rename = "stockMinimo")]
     pub stock_minimo: i64,
@@ -94,7 +95,7 @@ pub fn listar_productos() -> Result<Vec<Producto>, String> {
     let conn = open_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, sku, nombre, descripcion, precioUSD, stock, stockMinimo, activo
+            "SELECT id, sku, nombre, descripcion, monedaBase, precio, stock, stockMinimo, activo
              FROM Producto WHERE activo = 1 AND stock > 0
              ORDER BY nombre ASC",
         )
@@ -107,10 +108,11 @@ pub fn listar_productos() -> Result<Vec<Producto>, String> {
                 sku: row.get(1)?,
                 nombre: row.get(2)?,
                 descripcion: row.get(3)?,
-                precio_usd: row.get(4)?,
-                stock: row.get(5)?,
-                stock_minimo: row.get(6)?,
-                activo: row.get::<_, i32>(7)? == 1,
+                moneda_base: row.get(4)?,
+                precio: row.get(5)?,
+                stock: row.get(6)?,
+                stock_minimo: row.get(7)?,
+                activo: row.get::<_, i32>(8)? == 1,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -124,7 +126,7 @@ pub fn listar_productos_admin() -> Result<Vec<Producto>, String> {
     let conn = open_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, sku, nombre, descripcion, precioUSD, stock, stockMinimo, activo
+            "SELECT id, sku, nombre, descripcion, monedaBase, precio, stock, stockMinimo, activo
              FROM Producto ORDER BY nombre ASC",
         )
         .map_err(|e| e.to_string())?;
@@ -136,10 +138,11 @@ pub fn listar_productos_admin() -> Result<Vec<Producto>, String> {
                 sku: row.get(1)?,
                 nombre: row.get(2)?,
                 descripcion: row.get(3)?,
-                precio_usd: row.get(4)?,
-                stock: row.get(5)?,
-                stock_minimo: row.get(6)?,
-                activo: row.get::<_, i32>(7)? == 1,
+                moneda_base: row.get(4)?,
+                precio: row.get(5)?,
+                stock: row.get(6)?,
+                stock_minimo: row.get(7)?,
+                activo: row.get::<_, i32>(8)? == 1,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -152,16 +155,17 @@ pub fn crear_producto(
     sku: String,
     nombre: String,
     descripcion: Option<String>,
-    precio_usd: String,
+    moneda_base: String,
+    precio: String,
     stock: i64,
     stock_minimo: i64,
 ) -> Result<(), String> {
     let conn = open_db().map_err(|e| e.to_string())?;
     let id = Uuid::new_v4().to_string();
     conn.execute(
-        "INSERT INTO Producto (id, sku, nombre, descripcion, precioUSD, stock, stockMinimo, activo, isSynced, creadoEn, actualizadoEn)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 0, datetime('now'), datetime('now'))",
-        params![id, sku, nombre, descripcion, precio_usd, stock, stock_minimo],
+        "INSERT INTO Producto (id, sku, nombre, descripcion, monedaBase, precio, stock, stockMinimo, activo, isSynced, creadoEn, actualizadoEn)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, 0, datetime('now'), datetime('now'))",
+        params![id, sku, nombre, descripcion, moneda_base, precio, stock, stock_minimo],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -173,17 +177,18 @@ pub fn actualizar_producto(
     sku: String,
     nombre: String,
     descripcion: Option<String>,
-    precio_usd: String,
+    moneda_base: String,
+    precio: String,
     stock: i64,
     stock_minimo: i64,
     activo: bool,
 ) -> Result<(), String> {
     let conn = open_db().map_err(|e| e.to_string())?;
     conn.execute(
-        "UPDATE Producto SET sku=?1, nombre=?2, descripcion=?3, precioUSD=?4,
-         stock=?5, stockMinimo=?6, activo=?7, isSynced=0, actualizadoEn=datetime('now')
-         WHERE id=?8",
-        params![sku, nombre, descripcion, precio_usd, stock, stock_minimo, activo as i32, id],
+        "UPDATE Producto SET sku=?1, nombre=?2, descripcion=?3, monedaBase=?4, precio=?5,
+         stock=?6, stockMinimo=?7, activo=?8, isSynced=0, actualizadoEn=datetime('now')
+         WHERE id=?9",
+        params![sku, nombre, descripcion, moneda_base, precio, stock, stock_minimo, activo as i32, id],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -437,7 +442,7 @@ pub fn obtener_productos_pendientes() -> Result<Vec<serde_json::Value>, String> 
     let conn = open_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, sku, nombre, descripcion, precioUSD, stock, stockMinimo, activo, creadoEn
+            "SELECT id, sku, nombre, descripcion, monedaBase, precio, stock, stockMinimo, activo, creadoEn
              FROM Producto WHERE isSynced = 0",
         )
         .map_err(|e| e.to_string())?;
@@ -449,11 +454,12 @@ pub fn obtener_productos_pendientes() -> Result<Vec<serde_json::Value>, String> 
                 "sku": row.get::<_, String>(1)?,
                 "nombre": row.get::<_, String>(2)?,
                 "descripcion": row.get::<_, Option<String>>(3)?,
-                "precioUSD": row.get::<_, String>(4)?,
-                "stock": row.get::<_, i64>(5)?,
-                "stockMinimo": row.get::<_, i64>(6)?,
-                "activo": row.get::<_, i32>(7)? == 1,
-                "creadoEn": row.get::<_, String>(8)?,
+                "monedaBase": row.get::<_, String>(4)?,
+                "precio": row.get::<_, String>(5)?,
+                "stock": row.get::<_, i64>(6)?,
+                "stockMinimo": row.get::<_, i64>(7)?,
+                "activo": row.get::<_, i32>(8)? == 1,
+                "creadoEn": row.get::<_, String>(9)?,
                 "isSynced": false,
             }))
         })
@@ -714,19 +720,20 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
         let sku = p["sku"].as_str().unwrap_or("");
         let nombre = p["nombre"].as_str().unwrap_or("");
         let desc = p["descripcion"].as_str(); // Optional
-        let precio_usd = p["precioUSD"].as_str().unwrap_or("0");
+        let moneda_base = p["monedaBase"].as_str().unwrap_or("USD");
+        let precio = p["precio"].as_str().unwrap_or("0");
         let stock = p["stock"].as_i64().unwrap_or(0);
         let stock_min = p["stockMinimo"].as_i64().unwrap_or(0);
         let activo = p["activo"].as_bool().unwrap_or(true) as i32;
 
         tx.execute(
-            "INSERT INTO Producto (id, sku, nombre, descripcion, precioUSD, stock, stockMinimo, activo, isSynced, creadoEn, actualizadoEn)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, datetime('now'), datetime('now'))
+            "INSERT INTO Producto (id, sku, nombre, descripcion, monedaBase, precio, stock, stockMinimo, activo, isSynced, creadoEn, actualizadoEn)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, datetime('now'), datetime('now'))
              ON CONFLICT(id) DO UPDATE SET 
              sku=excluded.sku, nombre=excluded.nombre, descripcion=excluded.descripcion,
-             precioUSD=excluded.precioUSD, stock=excluded.stock, stockMinimo=excluded.stockMinimo,
+             monedaBase=excluded.monedaBase, precio=excluded.precio, stock=excluded.stock, stockMinimo=excluded.stockMinimo,
              activo=excluded.activo, isSynced=1, actualizadoEn=datetime('now')",
-            params![id, sku, nombre, desc, precio_usd, stock, stock_min, activo],
+            params![id, sku, nombre, desc, moneda_base, precio, stock, stock_min, activo],
         ).unwrap_or_default();
     }
 
