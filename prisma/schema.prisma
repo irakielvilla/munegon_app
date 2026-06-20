@@ -46,7 +46,8 @@ model Producto {
   sku           String   @unique
   nombre        String
   descripcion   String?
-  precioUSD     String // Guardado como String para precisión Decimal exacta
+  monedaBase    String   @default("USD")
+  precio        String // Guardado como String para precisión Decimal exacta
   stock         Int      @default(0)
   stockMinimo   Int      @default(5) // Alerta de stock bajo
   activo        Boolean  @default(true)

@@ -33,9 +33,48 @@ pub fn open_db() -> rusqlite::Result<Connection> {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let conn = Connection::open(path)?;
+    let mut conn = Connection::open(path)?;
     inicializar_tablas(&conn)?;
+    ejecutar_migraciones(&mut conn)?;
     Ok(conn)
+}
+
+fn ejecutar_migraciones(conn: &mut Connection) -> rusqlite::Result<()> {
+    // Verificar si la tabla Producto tiene la columna 'precioUSD' antigua
+    let (has_precio_usd, has_moneda_base) = {
+        let mut stmt = conn.prepare("PRAGMA table_info(Producto)")?;
+        let mut has_precio_usd = false;
+        let mut has_moneda_base = false;
+
+        let rows = stmt.query_map([], |row| {
+            let name: String = row.get(1)?;
+            Ok(name)
+        })?;
+
+        for name_result in rows {
+            if let Ok(name) = name_result {
+                if name == "precioUSD" {
+                    has_precio_usd = true;
+                } else if name == "monedaBase" {
+                    has_moneda_base = true;
+                }
+            }
+        }
+        (has_precio_usd, has_moneda_base)
+    };
+
+    if has_precio_usd && !has_moneda_base {
+        // Ejecutar migración
+        let tx = conn.transaction()?;
+        tx.execute("ALTER TABLE Producto RENAME COLUMN precioUSD TO precio", [])?;
+        tx.execute("ALTER TABLE Producto ADD COLUMN monedaBase TEXT NOT NULL DEFAULT 'USD'", [])?;
+        
+        // Limpiar los datos viejos que contenían "BS:"
+        tx.execute("UPDATE Producto SET monedaBase = 'BS', precio = substr(precio, 4) WHERE precio LIKE 'BS:%'", [])?;
+        tx.commit()?;
+    }
+
+    Ok(())
 }
 
 fn inicializar_tablas(conn: &Connection) -> rusqlite::Result<()> {
@@ -56,7 +95,8 @@ fn inicializar_tablas(conn: &Connection) -> rusqlite::Result<()> {
              sku TEXT UNIQUE NOT NULL,
              nombre TEXT NOT NULL,
              descripcion TEXT,
-             precioUSD TEXT NOT NULL,
+             monedaBase TEXT NOT NULL DEFAULT 'USD',
+             precio TEXT NOT NULL,
              stock INTEGER NOT NULL DEFAULT 0,
              stockMinimo INTEGER NOT NULL DEFAULT 5,
              activo INTEGER NOT NULL DEFAULT 1,

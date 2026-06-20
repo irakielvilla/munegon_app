@@ -62,8 +62,7 @@ Deno.serve(async (req) => {
     // ── Crear producto ──────────────────────────────────────
     if (accion === 'crear') {
       const { accion: _, ...payload } = body
-      const supabasePayload = { ...payload, precioUSD: payload.precioUsd, isSynced: true }
-      delete supabasePayload.precioUsd
+      const supabasePayload = { ...payload, isSynced: true }
       const { error } = await supabase.from('Producto').insert([supabasePayload])
       if (error) throw error
       return new Response(JSON.stringify({ ok: true }), {
@@ -75,10 +74,6 @@ Deno.serve(async (req) => {
     if (accion === 'actualizar') {
       const { accion: _, ...payload } = body
       const supabasePayload = { ...payload }
-      if (supabasePayload.precioUsd !== undefined) {
-        supabasePayload.precioUSD = supabasePayload.precioUsd
-        delete supabasePayload.precioUsd
-      }
       const { error } = await supabase
         .from('Producto')
         .update(supabasePayload)
