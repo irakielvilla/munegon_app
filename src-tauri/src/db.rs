@@ -74,6 +74,12 @@ fn ejecutar_migraciones(conn: &mut Connection) -> rusqlite::Result<()> {
         tx.commit()?;
     }
 
+            // Migración 3: Añadir anulada a LineaDeuda
+        let _ = conn.execute(
+            "ALTER TABLE LineaDeuda ADD COLUMN anulada BOOLEAN NOT NULL DEFAULT 0",
+            [],
+        );
+
     Ok(())
 }
 
@@ -122,6 +128,7 @@ fn inicializar_tablas(conn: &Connection) -> rusqlite::Result<()> {
              usuarioId TEXT NOT NULL,
              corteCajaId TEXT,
              subtotal TEXT NOT NULL,
+                anulada BOOLEAN NOT NULL DEFAULT 0,
              impuesto TEXT NOT NULL,
              total TEXT NOT NULL,
              formaPago TEXT NOT NULL,

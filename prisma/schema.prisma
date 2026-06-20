@@ -197,5 +197,6 @@ model LineaDeuda {
   precioUnit String
   subtotal   String
   activo     Boolean  @default(true)
+  anulada    Boolean  @default(false)
 }
 

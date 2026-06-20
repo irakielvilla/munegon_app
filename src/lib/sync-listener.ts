@@ -170,46 +170,45 @@ export async function iniciarSyncListener(): Promise<void> {
         const lineasDeudaData = deudas.flatMap((d) => (d['lineas'] as any[] || []));
         const deudaIdsSubir = deudasData.map((d: any) => d.id as string);
 
-        // Verificar cuáles deudas ya existían y su estado en Supabase
-        const { data: existingDeudas, error: checkErrD } = await supabase
-          .from('Deuda').select('id, activo').in('id', deudaIdsSubir);
-        if (checkErrD) throw new Error(`Error verificando deudas: ${checkErrD.message}`);
-        const existingDeudasMap = new Map((existingDeudas || []).map((d) => [d.id, d.activo]));
+        // --- MATEMATICA EXACTA DE DELTAS PARA INVENTARIO ---
+        // 1. Descargamos las líneas actuales de Supabase ANTES de sobreescribirlas
+        const { data: existingLineas, error: checkErrL } = await supabase
+          .from('LineaDeuda').select('id, cantidad, activo, productoId').in('deudaId', deudaIdsSubir);
+        if (checkErrL) throw new Error(`Error verificando lineas en la nube: ${checkErrL.message}`);
+        
+        const cloudLineasMap = new Map((existingLineas || []).map(l => [l.id, { cantidad: l.cantidad, activo: l.activo, productoId: l.productoId }]));
+        const stockUpdatesDeudas: Record<string, number> = {};
 
+        // 2. Calculamos los deltas línea por línea
+        for (const localLinea of lineasDeudaData) {
+          const cloudLinea = cloudLineasMap.get(localLinea.id);
+          const cloudQty = (cloudLinea && cloudLinea.activo) ? cloudLinea.cantidad : 0;
+          
+          let localQty = 0;
+          if (localLinea.activo) {
+            localQty = localLinea.cantidad;
+          } else if (!localLinea.anulada) {
+            // Si está inactiva pero NO anulada, fue PAGADA.
+            // Las líneas pagadas NO devuelven stock, así que igualamos a la cantidad de la nube
+            // para que el delta sea 0.
+            localQty = cloudQty;
+          }
+          
+          const delta = localQty - cloudQty; // positivo = restar de inventario, negativo = reponer inventario
+          
+          if (delta !== 0) {
+            const pid = localLinea.productoId;
+            stockUpdatesDeudas[pid] = (stockUpdatesDeudas[pid] || 0) + delta;
+          }
+        }
+
+        // 3. Upsert de la información a Supabase (DESPUÉS de haber extraído los deltas)
         const { error: dErr } = await supabase.from('Deuda').upsert(deudasData, { onConflict: 'id' });
         if (dErr) throw new Error(`Deudas: ${dErr.message}`);
 
         if (lineasDeudaData.length > 0) {
           const { error: ldErr } = await supabase.from('LineaDeuda').upsert(lineasDeudaData, { onConflict: 'id' });
           if (ldErr) throw new Error(`Lineas de deuda: ${ldErr.message}`);
-        }
-
-        // --- MATEMATICA DE INVENTARIO PARA DEUDAS ---
-        const stockUpdatesDeudas: Record<string, number> = {};
-
-        for (const deuda of deudas) {
-          const dId = deuda.id as string;
-          const wasActiveInCloud = existingDeudasMap.get(dId);
-          const isNowActive = deuda.activo as boolean;
-          const isAnulada = deuda.anulada as boolean;
-
-          const lineas = (deuda.lineas as any[]) || [];
-
-          if (wasActiveInCloud === undefined && isNowActive) {
-            // Es una deuda NUEVA (fiar). Hay que RESTAR stock.
-            for (const linea of lineas) {
-              const pid = linea.productoId;
-              stockUpdatesDeudas[pid] = (stockUpdatesDeudas[pid] || 0) + (linea.cantidad as number); // Sumamos a la cantidad a restar
-            }
-          } else if (wasActiveInCloud === true && !isNowActive && isAnulada) {
-            // Era activa, ahora es inactiva y está ANULADA. Hay que REPONER stock.
-            // Para la reposición matemática usaremos un valor negativo en stockUpdatesDeudas, 
-            // ya que al final se resta. Restar un negativo = sumar.
-            for (const linea of lineas) {
-              const pid = linea.productoId;
-              stockUpdatesDeudas[pid] = (stockUpdatesDeudas[pid] || 0) - (linea.cantidad as number);
-            }
-          }
         }
 
         for (const [productoId, cantidadRestar] of Object.entries(stockUpdatesDeudas)) {

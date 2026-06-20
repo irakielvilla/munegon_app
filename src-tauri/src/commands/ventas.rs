@@ -1344,7 +1344,7 @@ pub fn eliminar_linea_deuda(deuda_id: String, linea_id: String) -> Result<(), St
         rusqlite::params![cantidad, producto_id],
     ).map_err(|e| e.to_string())?;
 
-    tx.execute("UPDATE LineaDeuda SET activo = false WHERE id = ?1", rusqlite::params![linea_id]).map_err(|e| e.to_string())?;
+    tx.execute("UPDATE LineaDeuda SET activo = false, anulada = true WHERE id = ?1", rusqlite::params![linea_id]).map_err(|e| e.to_string())?;
 
     let lineas_count: i64 = tx
         .query_row("SELECT COUNT(*) FROM LineaDeuda WHERE deudaId = ?1 AND activo = 1", rusqlite::params![deuda_id], |row| row.get(0))
@@ -1492,7 +1492,7 @@ pub fn obtener_deudas_pendientes() -> Result<Vec<serde_json::Value>, String> {
         if let Ok(mut d) = row {
             let deuda_id = d["id"].as_str().unwrap().to_string();
             let mut stmt_lineas = conn
-                .prepare("SELECT id, deudaId, productoId, cantidad, precioUnit, subtotal, activo FROM LineaDeuda WHERE deudaId = ?1")
+                .prepare("SELECT id, deudaId, productoId, cantidad, precioUnit, subtotal, activo, anulada FROM LineaDeuda WHERE deudaId = ?1")
                 .unwrap();
             let lineas_rows = stmt_lineas
                 .query_map(rusqlite::params![deuda_id], |row| {
