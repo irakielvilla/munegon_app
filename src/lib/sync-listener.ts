@@ -251,6 +251,15 @@ export async function iniciarSyncListener(): Promise<void> {
       const { data: pullLineas, error: lErr } = await supabase.from('LineaVenta').select('*');
       if (lErr) console.error('[Sync] Error pull lineas:', lErr.message);
 
+      const { data: pullClientes, error: cliErr } = await supabase.from('Cliente').select('*');
+      if (cliErr) console.error('[Sync] Error pull clientes:', cliErr.message);
+
+      const { data: pullDeudas, error: dErrPull } = await supabase.from('Deuda').select('*');
+      if (dErrPull) console.error('[Sync] Error pull deudas:', dErrPull.message);
+
+      const { data: pullLineasDeuda, error: ldErrPull } = await supabase.from('LineaDeuda').select('*');
+      if (ldErrPull) console.error('[Sync] Error pull lineas deuda:', ldErrPull.message);
+
       // Descargar solo el IVA para no sobreescribir la tasa de cambio local
       const { data: pullConfig, error: cfgErr } = await supabase.from('Configuracion').select('*').eq('clave', 'iva_porcentaje');
       if (cfgErr) console.error('[Sync] Error pull config:', cfgErr.message);
@@ -262,10 +271,13 @@ export async function iniciarSyncListener(): Promise<void> {
           cortes: pullCortes || [],
           ventas: pullVentas || [],
           lineas: pullLineas || [],
+          clientes: pullClientes || [],
+          deudas: pullDeudas || [],
+          lineas_deuda: pullLineasDeuda || [],
           configuracion: pullConfig || [],
         },
       });
-      console.log(`[Sync] 📥 Pull guardado: ${pullUsuarios?.length} usuarios, ${pullProductos?.length} productos, ${pullVentas?.length} ventas.`);
+      console.log(`[Sync] 📥 Pull guardado: ${pullUsuarios?.length} usuarios, ${pullProductos?.length} productos, ${pullVentas?.length} ventas, ${pullClientes?.length} clientes, ${pullDeudas?.length} deudas.`);
 
       if (totalSynced > 0) {
         await invoke('marcar_sincronizados', { ventaIds, productoIds, logIds, corteIds, clienteIds, deudaIds });

@@ -679,6 +679,9 @@ pub struct PullPayload {
     cortes: Vec<serde_json::Value>,
     ventas: Option<Vec<serde_json::Value>>,
     lineas: Option<Vec<serde_json::Value>>,
+    clientes: Option<Vec<serde_json::Value>>,
+    deudas: Option<Vec<serde_json::Value>>,
+    lineas_deuda: Option<Vec<serde_json::Value>>,
     configuracion: Option<Vec<serde_json::Value>>,
 }
 
@@ -900,6 +903,79 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
                     params![clave, valor],
                 );
             }
+        }
+    }
+
+    // 10. Guardar Clientes
+    if let Some(clientes) = payload.clientes {
+        for c in clientes {
+            let id = c["id"].as_str().unwrap_or("");
+            if id.is_empty() { continue; }
+            let nombre = c["nombre"].as_str().unwrap_or("");
+            let apellido = c["apellido"].as_str().unwrap_or("");
+            let telefono = c["telefono"].as_str(); // Option
+            let activo = c["activo"].as_bool().unwrap_or(true) as i32;
+            let creado_en = c["creadoEn"].as_str().unwrap_or("");
+
+            let _ = tx.execute(
+                "INSERT INTO Cliente (id, nombre, apellido, telefono, activo, isSynced, creadoEn)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6)
+                 ON CONFLICT(id) DO UPDATE SET 
+                 nombre=excluded.nombre, apellido=excluded.apellido, telefono=excluded.telefono,
+                 activo=excluded.activo, isSynced=1, creadoEn=excluded.creadoEn",
+                params![id, nombre, apellido, telefono, activo, creado_en],
+            );
+        }
+    }
+
+    // 11. Guardar Deudas
+    if let Some(deudas) = payload.deudas {
+        for d in deudas {
+            let id = d["id"].as_str().unwrap_or("");
+            if id.is_empty() { continue; }
+            let cliente_id = d["clienteId"].as_str().unwrap_or("");
+            let usuario_id = d["usuarioId"].as_str().unwrap_or("");
+            let subtotal = d["subtotal"].as_str().unwrap_or("0.00");
+            let impuesto = d["impuesto"].as_str().unwrap_or("0.00");
+            let total = d["total"].as_str().unwrap_or("0.00");
+            let activo = d["activo"].as_bool().unwrap_or(true) as i32;
+            let anulada = d["anulada"].as_bool().unwrap_or(false) as i32;
+            let creado_en = d["creadoEn"].as_str().unwrap_or("");
+
+            let _ = tx.execute(
+                "INSERT INTO Deuda (id, clienteId, usuarioId, subtotal, impuesto, total, activo, anulada, isSynced, creadoEn)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9)
+                 ON CONFLICT(id) DO UPDATE SET 
+                 clienteId=excluded.clienteId, usuarioId=excluded.usuarioId, subtotal=excluded.subtotal,
+                 impuesto=excluded.impuesto, total=excluded.total, activo=excluded.activo, 
+                 anulada=excluded.anulada, isSynced=1, creadoEn=excluded.creadoEn",
+                params![id, cliente_id, usuario_id, subtotal, impuesto, total, activo, anulada, creado_en],
+            );
+        }
+    }
+
+    // 12. Guardar Líneas de Deuda
+    if let Some(lineas_deuda) = payload.lineas_deuda {
+        for l in lineas_deuda {
+            let id = l["id"].as_str().unwrap_or("");
+            if id.is_empty() { continue; }
+            let deuda_id = l["deudaId"].as_str().unwrap_or("");
+            let producto_id = l["productoId"].as_str().unwrap_or("");
+            let cantidad = l["cantidad"].as_i64().unwrap_or(0);
+            let precio_unit = l["precioUnit"].as_str().unwrap_or("0.00");
+            let subtotal = l["subtotal"].as_str().unwrap_or("0.00");
+            let activo = l["activo"].as_bool().unwrap_or(true) as i32;
+            let anulada = l["anulada"].as_bool().unwrap_or(false) as i32;
+
+            let _ = tx.execute(
+                "INSERT INTO LineaDeuda (id, deudaId, productoId, cantidad, precioUnit, subtotal, activo, anulada)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(id) DO UPDATE SET 
+                 deudaId=excluded.deudaId, productoId=excluded.productoId,
+                 cantidad=excluded.cantidad, precioUnit=excluded.precioUnit, subtotal=excluded.subtotal,
+                 activo=excluded.activo, anulada=excluded.anulada",
+                params![id, deuda_id, producto_id, cantidad, precio_unit, subtotal, activo, anulada],
+            );
         }
     }
 
