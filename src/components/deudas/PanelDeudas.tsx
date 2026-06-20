@@ -234,6 +234,7 @@ function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
 
 export default function PanelDeudas() {
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
+  const [busqueda, setBusqueda] = useState('');
   const [totalesCliente, setTotalesCliente] = useState<Record<string, number>>({});
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteInfo | null>(null);
   const [deudas, setDeudas] = useState<DeudaInfo[]>([]);
@@ -443,24 +444,52 @@ export default function PanelDeudas() {
   const selectedImpuesto = Object.values(lineasSeleccionadas).reduce((acc, curr) => acc + curr.impuesto, 0);
   const selectedTotal = selectedSubtotal + selectedImpuesto;
 
+  // Filtrar clientes
+  const term = busqueda.toLowerCase().trim();
+  const clientesFiltrados = term === '' 
+    ? clientes 
+    : clientes.filter(c => 
+        c.nombre.toLowerCase().includes(term) || 
+        c.apellido.toLowerCase().includes(term) ||
+        (c.telefono && c.telefono.includes(term))
+      );
+
   return (
     <div class="deudas-container">
       {/* Lateral izquierdo: Lista de clientes deudores */}
       <aside class="deudas-sidebar">
         <div class="deudas-sidebar-header">
-          👥 Clientes de Cuentas por Cobrar
+          👥 Clientes Deudores
+        </div>
+        <div class="deudas-search-container" style={{ padding: '0.8rem', borderBottom: '1px solid var(--border)' }}>
+          <input 
+            type="text" 
+            placeholder="Buscar por nombre o teléfono..." 
+            value={busqueda}
+            onInput={(e) => setBusqueda((e.target as HTMLInputElement).value)}
+            style={{
+              width: '100%',
+              padding: '0.6rem 0.8rem',
+              borderRadius: '6px',
+              border: '1px solid var(--border-subtle)',
+              background: 'var(--bg3)',
+              color: 'var(--text)',
+              fontSize: '0.9rem',
+              outline: 'none'
+            }}
+          />
         </div>
         <div class="deudas-client-list">
-          {cargandoLista && clientes.length === 0 ? (
+          {cargandoLista && clientesFiltrados.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)' }}>
               Cargando catálogo...
             </div>
-          ) : clientes.length === 0 ? (
+          ) : clientesFiltrados.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)', fontSize: '0.85rem' }}>
-              No hay clientes registrados en cuentas por cobrar.
+              {clientes.length === 0 ? 'No hay clientes registrados en cuentas por cobrar.' : 'No se encontraron clientes para la búsqueda.'}
             </div>
           ) : (
-            clientes.map((c) => {
+            clientesFiltrados.map((c) => {
               const activo = clienteSeleccionado?.id === c.id;
               const total = totalesCliente[c.id] || 0;
               return (
