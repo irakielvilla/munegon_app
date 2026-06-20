@@ -121,6 +121,7 @@ async function invokeTauri<T>(cmd: string, args: any = {}): Promise<T> {
 // solo necesita el token de acceso (MUNEGON_API_SECRET) y la URL base.
 const EDGE_BASE_URL = import.meta.env.PUBLIC_SUPABASE_URL || '';
 const EDGE_SECRET   = import.meta.env.PUBLIC_MUNEGON_API_SECRET || '';
+const EDGE_ANON_KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
 
 async function callEdge<T>(fn: string, body: object): Promise<T> {
   const url = `${EDGE_BASE_URL}/functions/v1/${fn}`;
@@ -129,6 +130,7 @@ async function callEdge<T>(fn: string, body: object): Promise<T> {
     headers: {
       'Content-Type': 'application/json',
       'X-Munegon-Key': EDGE_SECRET,
+      'Authorization': `Bearer ${EDGE_ANON_KEY}`,
     },
     body: JSON.stringify(body),
   });
@@ -144,10 +146,10 @@ async function callEdge<T>(fn: string, body: object): Promise<T> {
 // ──────────────────────────────────────────────────────────────
 
 export const api = {
-  // ── CUENTAS POR COBRAR (LOCAL) ──
+  // ── CUENTAS POR COBRAR (LOCAL / WEB) ──
   listar_clientes: async (): Promise<ClienteInfo[]> => {
     if (isTauri()) return invokeTauri<ClienteInfo[]>('listar_clientes');
-    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+    return callEdge<ClienteInfo[]>('fn-deudas', { accion: 'listar_clientes' });
   },
 
   crear_cliente: async (nombre: string, apellido: string, telefono?: string): Promise<string> => {
@@ -169,7 +171,7 @@ export const api = {
 
   listar_deudas_cliente: async (clienteId: string): Promise<DeudaInfo[]> => {
     if (isTauri()) return invokeTauri<DeudaInfo[]>('listar_deudas_cliente', { clienteId });
-    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+    return callEdge<DeudaInfo[]>('fn-deudas', { accion: 'listar_deudas_cliente', clienteId });
   },
 
   pagar_deudas_productos: async (payload: {

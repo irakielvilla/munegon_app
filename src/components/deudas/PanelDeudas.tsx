@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { api, parseLocalDate } from '../../lib/api';
+import { api, isTauri, parseLocalDate } from '../../lib/api';
 import { getSession } from '../../lib/auth';
 import ModalOverlay from '../ui/ModalOverlay';
 
