@@ -203,6 +203,11 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
   const [nuevoApellido, setNuevoApellido] = useState('');
   const [nuevoTelefono, setNuevoTelefono] = useState('');
   const [cargandoClientes, setCargandoClientes] = useState(false);
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+
+  const clientesFiltrados = clientes.filter(c => 
+    `${c.nombre} ${c.apellido}`.toLowerCase().includes(busquedaCliente.toLowerCase())
+  );
 
   const tasaNum = parseFloat(tasa) || 1;
   const totalBs = totalUSD * tasaNum;
@@ -337,9 +342,24 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
         {forma === 'CUENTA_COBRAR' && (
           <div class="cliente-cobrar-lateral">
             {!creandoCliente ? (
-              <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label for="cliente-select" style={{ fontSize: '0.78rem', color: 'var(--text2)' }}>Seleccionar Cliente *</label>
-                <div class="cliente-select-row">
+                <button
+                  type="button"
+                  class="btn-nuevo-cliente"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => setCreandoCliente(true)}
+                >
+                  ➕ Nuevo Cliente
+                </button>
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar cliente deudor..."
+                  value={busquedaCliente}
+                  onInput={(e) => setBusquedaCliente((e.target as HTMLInputElement).value)}
+                  style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                />
+                <div class="cliente-select-row" style={{ flexDirection: 'column', width: '100%' }}>
                   {cargandoClientes ? (
                     <span style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Cargando clientes...</span>
                   ) : (
@@ -348,11 +368,13 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
                       value={clienteId}
                       onChange={(e) => setClienteId((e.target as HTMLSelectElement).value)}
                       class="cliente-select"
+                      style={{ width: '100%' }}
+                      size={5}
                     >
-                      {clientes.length === 0 ? (
-                        <option value="">No hay clientes registrados</option>
+                      {clientesFiltrados.length === 0 ? (
+                        <option value="">No se encontraron clientes</option>
                       ) : (
-                        clientes.map((c) => (
+                        clientesFiltrados.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.nombre} {c.apellido}
                           </option>
@@ -360,13 +382,6 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
                       )}
                     </select>
                   )}
-                  <button
-                    type="button"
-                    class="btn-nuevo-cliente"
-                    onClick={() => setCreandoCliente(true)}
-                  >
-                    ➕ Nuevo
-                  </button>
                 </div>
               </div>
             ) : (

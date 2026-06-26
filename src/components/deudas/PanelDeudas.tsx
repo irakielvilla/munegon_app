@@ -392,6 +392,30 @@ export default function PanelDeudas() {
     });
   };
 
+  const toggleTodasLineas = (deuda: DeudaInfo, seleccionar: boolean) => {
+    setLineasSeleccionadas((prev) => {
+      const copy = { ...prev };
+      deuda.lineas.forEach((linea) => {
+        if (seleccionar) {
+          const subtotal = parseFloat(linea.subtotal) || 0;
+          const origSubtotal = parseFloat(deuda.subtotal) || 1;
+          const origImpuesto = parseFloat(deuda.impuesto) || 0;
+          const ratio = origImpuesto / origSubtotal;
+          const impuesto = subtotal * ratio;
+
+          copy[linea.id] = {
+            deudaId: deuda.id,
+            subtotal,
+            impuesto,
+          };
+        } else {
+          delete copy[linea.id];
+        }
+      });
+      return copy;
+    });
+  };
+
   const procesarPagoDeuda = async (forma: string, referencia?: string) => {
     const session = getSession();
     if (!session) {
@@ -629,7 +653,20 @@ export default function PanelDeudas() {
                         <table class="deuda-items-table">
                           <thead>
                             <tr>
-                              {modoCobroActivo && <th style={{ width: '40px', textAlign: 'center' }}></th>}
+                              {modoCobroActivo && (
+                                <th style={{ width: '40px', textAlign: 'center' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={d.lineas.length > 0 && d.lineas.every(l => !!lineasSeleccionadas[l.id])}
+                                    onChange={(e) => {
+                                      const checked = (e.target as HTMLInputElement).checked;
+                                      toggleTodasLineas(d, checked);
+                                    }}
+                                    style={{ cursor: 'pointer', scale: '1.2' }}
+                                    title="Seleccionar todos"
+                                  />
+                                </th>
+                              )}
                               <th>Producto</th>
                               <th style={{ textAlign: 'center' }}>Cantidad</th>
                               <th style={{ textAlign: 'right' }}>Precio Unit.</th>
