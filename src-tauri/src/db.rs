@@ -86,6 +86,24 @@ fn ejecutar_migraciones(conn: &mut Connection) -> rusqlite::Result<()> {
             [],
         );
 
+        // Migración 5: Añadir esCobroDeuda a Venta
+        let _ = conn.execute(
+            "ALTER TABLE Venta ADD COLUMN esCobroDeuda BOOLEAN NOT NULL DEFAULT 0",
+            [],
+        );
+
+        // Migración 6: Añadir observaciones a Cliente
+        let _ = conn.execute(
+            "ALTER TABLE Cliente ADD COLUMN observaciones TEXT",
+            [],
+        );
+
+        // Migración 7: Añadir anulada a Venta
+        let _ = conn.execute(
+            "ALTER TABLE Venta ADD COLUMN anulada BOOLEAN NOT NULL DEFAULT 0",
+            [],
+        );
+
     Ok(())
 }
 
@@ -143,6 +161,7 @@ fn inicializar_tablas(conn: &Connection) -> rusqlite::Result<()> {
              tasaCambio TEXT,
              creadoEn TEXT NOT NULL DEFAULT (datetime('now')),
              isSynced INTEGER NOT NULL DEFAULT 0,
+             esCobroDeuda BOOLEAN NOT NULL DEFAULT 0,
              FOREIGN KEY(usuarioId) REFERENCES Usuario(id),
              FOREIGN KEY(corteCajaId) REFERENCES CorteCaja(id)
          );
@@ -183,6 +202,7 @@ fn inicializar_tablas(conn: &Connection) -> rusqlite::Result<()> {
              nombre TEXT NOT NULL,
              apellido TEXT NOT NULL,
              telefono TEXT,
+             observaciones TEXT,
              activo INTEGER NOT NULL DEFAULT 1,
              creadoEn TEXT NOT NULL DEFAULT (datetime('now')),
              isSynced INTEGER NOT NULL DEFAULT 0

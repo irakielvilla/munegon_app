@@ -1,4 +1,34 @@
 import { useState, useEffect } from 'preact/hooks';
+import { Component } from 'preact';
+
+class ErrorBoundary extends Component<any, { hasError: boolean; error: Error | null }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', color: 'red', background: '#fff', height: '100vh' }}>
+          <h2>Algo falló en la pantalla de deudas:</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {this.state.error?.toString()}
+          </pre>
+          <pre style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#555' }}>
+            {this.state.error?.stack}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 import { api, isTauri, parseLocalDate } from '../../lib/api';
 import { getSession } from '../../lib/auth';
 import ModalOverlay from '../ui/ModalOverlay';
@@ -18,6 +48,7 @@ interface LineaDeudaInfo {
   cantidad: number;
   precioUnit: string;
   subtotal: string;
+  pagada: boolean;
 }
 
 interface DeudaInfo {
@@ -28,6 +59,7 @@ interface DeudaInfo {
   impuesto: string;
   total: string;
   creadoEn: string;
+  pagada: boolean;
   lineas: LineaDeudaInfo[];
 }
 
@@ -152,14 +184,18 @@ const formatFecha = (isoStr: string) => {
 };
 
 interface ModalClienteProps {
+  initialNombre?: string;
+  initialApellido?: string;
+  initialTelefono?: string;
+  isEditing?: boolean;
   onConfirmar: (nombre: string, apellido: string, telefono?: string) => Promise<void>;
   onCerrar: () => void;
 }
 
-function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
-  const [nuevoNombre, setNuevoNombre] = useState('');
-  const [nuevoApellido, setNuevoApellido] = useState('');
-  const [nuevoTelefono, setNuevoTelefono] = useState('');
+function ModalCliente({ initialNombre = '', initialApellido = '', initialTelefono = '', isEditing = false, onConfirmar, onCerrar }: ModalClienteProps) {
+  const [nuevoNombre, setNuevoNombre] = useState(initialNombre);
+  const [nuevoApellido, setNuevoApellido] = useState(initialApellido);
+  const [nuevoTelefono, setNuevoTelefono] = useState(initialTelefono);
   const [procesando, setProcesando] = useState(false);
 
   const guardar = async () => {
@@ -172,7 +208,7 @@ function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
       await onConfirmar(nuevoNombre.trim(), nuevoApellido.trim(), nuevoTelefono.trim() || undefined);
       onCerrar();
     } catch(e) {
-      alert(`Error creando cliente: ${e}`);
+      alert(`Error ${isEditing ? 'editando' : 'creando'} cliente: ${e}`);
     } finally {
       setProcesando(false);
     }
@@ -182,7 +218,7 @@ function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
     <ModalOverlay>
       <div class="modal-card" style={{ maxWidth: '400px' }}>
         <div class="modal-header">
-          <h2>➕ Registrar Nuevo Cliente</h2>
+          <h2>{isEditing ? '✏️ Editar Cliente' : '➕ Registrar Nuevo Cliente'}</h2>
           <button class="modal-close" onClick={onCerrar}>✕</button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
@@ -192,7 +228,7 @@ function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
               id="nuevo-nombre"
               type="text"
               value={nuevoNombre}
-              onInput={(e) => setNuevoNombre((e.target as HTMLInputElement).value.toUpperCase())}
+              onInput={e => setNuevoNombre((e.target as HTMLInputElement).value.toUpperCase())}
               placeholder="Ej. DANIEL"
               style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.6rem', fontSize: '0.95rem', outline: 'none', textTransform: 'uppercase' }}
               autoFocus
@@ -204,18 +240,18 @@ function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
               id="nuevo-apellido"
               type="text"
               value={nuevoApellido}
-              onInput={(e) => setNuevoApellido((e.target as HTMLInputElement).value.toUpperCase())}
+              onInput={e => setNuevoApellido((e.target as HTMLInputElement).value.toUpperCase())}
               placeholder="Ej. TREJO"
               style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.6rem', fontSize: '0.95rem', outline: 'none', textTransform: 'uppercase' }}
             />
           </div>
           <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            <label for="nuevo-telefono" style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Teléfono (Opcional)</label>
+            <label for="nuevo-telefono" style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Teléfono (opcional)</label>
             <input
               id="nuevo-telefono"
               type="text"
               value={nuevoTelefono}
-              onInput={(e) => setNuevoTelefono((e.target as HTMLInputElement).value)}
+              onInput={e => setNuevoTelefono((e.target as HTMLInputElement).value)}
               placeholder="Ej. 04121234567"
               style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.6rem', fontSize: '0.95rem', outline: 'none' }}
             />
@@ -224,7 +260,7 @@ function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
         <div class="modal-actions" style={{ marginTop: '1.5rem' }}>
           <button class="btn-cancelar" onClick={onCerrar}>Cancelar</button>
           <button class="btn-confirmar" onClick={guardar} disabled={procesando}>
-            {procesando ? 'Guardando...' : '💾 Guardar Cliente'}
+            {procesando ? 'Guardando...' : (isEditing ? 'Guardar Cambios' : 'Crear Cliente')}
           </button>
         </div>
       </div>
@@ -232,11 +268,12 @@ function ModalCliente({ onConfirmar, onCerrar }: ModalClienteProps) {
   );
 }
 
-export default function PanelDeudas() {
+function PanelDeudasContenido() {
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [totalesCliente, setTotalesCliente] = useState<Record<string, number>>({});
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteInfo | null>(null);
+  const [observacionesLocales, setObservacionesLocales] = useState('');
   const [deudas, setDeudas] = useState<DeudaInfo[]>([]);
   const [cargandoLista, setCargandoLista] = useState(false);
   const [cargandoDetalles, setCargandoDetalles] = useState(false);
@@ -251,6 +288,8 @@ export default function PanelDeudas() {
   // Estados de edición y gestión
   const [modoEdicionActivo, setModoEdicionActivo] = useState(false);
   const [creandoCliente, setCreandoCliente] = useState(false);
+  const [editandoCliente, setEditandoCliente] = useState(false);
+  const [mostrarPagados, setMostrarPagados] = useState(true);
 
   const handleCrearCliente = async (nombre: string, apellido: string, telefono?: string) => {
     const id = await api.crear_cliente(nombre, apellido, telefono);
@@ -259,6 +298,18 @@ export default function PanelDeudas() {
     // Auto seleccionar el nuevo cliente
     const info = { id, nombre, apellido, telefono: telefono || null, activo: true };
     seleccionarCliente(info);
+  };
+
+  const handleEditarCliente = async (nombre: string, apellido: string, telefono?: string) => {
+    if (!clienteSeleccionado) return;
+    await api.actualizar_cliente(clienteSeleccionado.id, nombre, apellido, telefono);
+    cargarClientes();
+    setClienteSeleccionado({
+      ...clienteSeleccionado,
+      nombre,
+      apellido,
+      telefono: telefono || null,
+    });
   };
 
   const handleBorrarCliente = async () => {
@@ -356,6 +407,7 @@ export default function PanelDeudas() {
 
   const seleccionarCliente = async (cliente: ClienteInfo) => {
     setClienteSeleccionado(cliente);
+    setObservacionesLocales(cliente.observaciones || '');
     setCargandoDetalles(true);
     // Limpiar selección de cobro al cambiar de cliente
     setModoCobroActivo(false);
@@ -370,7 +422,20 @@ export default function PanelDeudas() {
     }
   };
 
+  const handleBlurObservaciones = async () => {
+    if (!clienteSeleccionado) return;
+    try {
+      await api.actualizar_observaciones_cliente(clienteSeleccionado.id, observacionesLocales);
+      // Actualizamos silenciosamente la info local para que perdure al recargar la lista
+      setClienteSeleccionado(prev => prev ? { ...prev, observaciones: observacionesLocales } : null);
+      setClientes(prev => prev.map(c => c.id === clienteSeleccionado.id ? { ...c, observaciones: observacionesLocales } : c));
+    } catch (e) {
+      console.error('Error guardando observaciones:', e);
+    }
+  };
+
   const toggleLinea = (deuda: DeudaInfo, linea: LineaDeudaInfo) => {
+    if (linea.pagada) return;
     setLineasSeleccionadas((prev) => {
       const copy = { ...prev };
       if (copy[linea.id]) {
@@ -396,6 +461,7 @@ export default function PanelDeudas() {
     setLineasSeleccionadas((prev) => {
       const copy = { ...prev };
       deuda.lineas.forEach((linea) => {
+        if (linea.pagada) return;
         if (seleccionar) {
           const subtotal = parseFloat(linea.subtotal) || 0;
           const origSubtotal = parseFloat(deuda.subtotal) || 1;
@@ -478,6 +544,12 @@ export default function PanelDeudas() {
         (c.telefono && c.telefono.includes(term))
       );
 
+  const deudasVisibles = mostrarPagados 
+    ? deudas 
+    : deudas
+        .map(d => ({ ...d, lineas: d.lineas.filter(l => !l.pagada) }))
+        .filter(d => !d.pagada && d.lineas.length > 0);
+
   return (
     <div class="deudas-container">
       {/* Lateral izquierdo: Lista de clientes deudores */}
@@ -548,6 +620,15 @@ export default function PanelDeudas() {
             ➕ Agregar Cliente
           </button>
           <button
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: '600', cursor: clienteSeleccionado ? 'pointer' : 'not-allowed', opacity: clienteSeleccionado ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
+            disabled={!clienteSeleccionado}
+            onClick={() => setEditandoCliente(true)}
+            onMouseEnter={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'var(--bg3)')}
+            onMouseLeave={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'transparent')}
+          >
+            ✏️ Editar Cliente
+          </button>
+          <button
             style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontWeight: '600', cursor: clienteSeleccionado ? 'pointer' : 'not-allowed', opacity: clienteSeleccionado ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
             disabled={!clienteSeleccionado}
             onClick={handleBorrarCliente}
@@ -582,6 +663,12 @@ export default function PanelDeudas() {
                 <div class="deudas-total-acumulado">
                   <span>Deuda Total Pendiente</span>
                   <strong>${fmtBs(totalAcumulado)} USD</strong>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginRight: '1rem' }}>
+                  <label style={{ fontSize: '0.85rem', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={mostrarPagados} onChange={e => setMostrarPagados((e.target as HTMLInputElement).checked)} />
+                    Mostrar cobrados
+                  </label>
                 </div>
                 {deudas.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -619,15 +706,15 @@ export default function PanelDeudas() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text2)' }}>
                 ⏳ Cargando desglose de deudas...
               </div>
-            ) : deudas.length === 0 ? (
+            ) : deudasVisibles.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text2)', fontSize: '0.9rem' }}>
-                ✅ Este cliente no tiene cuentas pendientes de pago.
+                ✅ Este cliente no tiene cuentas pendientes de pago en la vista actual.
               </div>
             ) : (
               <>
                 <div class="deudas-sessions-list">
-                  {deudas.map((d) => (
-                    <div key={d.id} class="deuda-session-card">
+                  {deudasVisibles.map((d) => (
+                    <div key={d.id} class="deuda-session-card" style={d.pagada ? { opacity: 0.6, background: 'var(--bg2)' } : {}}>
                       {/* Encabezado de la transacción/sesión de compra */}
                       <div class="deuda-session-header">
                         <span class="deuda-session-date">
@@ -655,16 +742,18 @@ export default function PanelDeudas() {
                             <tr>
                               {modoCobroActivo && (
                                 <th style={{ width: '40px', textAlign: 'center' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={d.lineas.length > 0 && d.lineas.every(l => !!lineasSeleccionadas[l.id])}
-                                    onChange={(e) => {
-                                      const checked = (e.target as HTMLInputElement).checked;
-                                      toggleTodasLineas(d, checked);
-                                    }}
-                                    style={{ cursor: 'pointer', scale: '1.2' }}
-                                    title="Seleccionar todos"
-                                  />
+                                  {!d.pagada && (
+                                    <input
+                                      type="checkbox"
+                                      checked={d.lineas.filter(l => !l.pagada).length > 0 && d.lineas.filter(l => !l.pagada).every(l => !!lineasSeleccionadas[l.id])}
+                                      onChange={(e) => {
+                                        const checked = (e.target as HTMLInputElement).checked;
+                                        toggleTodasLineas(d, checked);
+                                      }}
+                                      style={{ cursor: 'pointer', scale: '1.2' }}
+                                      title="Seleccionar todos"
+                                    />
+                                  )}
                                 </th>
                               )}
                               <th>Producto</th>
@@ -676,52 +765,61 @@ export default function PanelDeudas() {
                             </tr>
                           </thead>
                           <tbody>
-                            {d.lineas.map((linea) => (
-                              <tr key={linea.id}>
-                                {modoCobroActivo && (
-                                  <td style={{ textAlign: 'center' }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={!!lineasSeleccionadas[linea.id]}
-                                      onChange={() => toggleLinea(d, linea)}
-                                      style={{ cursor: 'pointer', scale: '1.2' }}
-                                    />
-                                  </td>
-                                )}
-                                <td>{linea.productoNombre}</td>
-                                <td style={{ textAlign: 'center' }}>
-                                  {modoEdicionActivo ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                                      <button 
-                                        onClick={() => handleCambiarCantidadLinea(d.id, linea.id, linea.cantidad - 1)}
-                                        style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.1rem 0.4rem', cursor: 'pointer', color: 'var(--text)' }}
-                                      >-</button>
-                                      <span style={{ minWidth: '1.5rem', textAlign: 'center' }}>{linea.cantidad}</span>
-                                      <button 
-                                        onClick={() => handleCambiarCantidadLinea(d.id, linea.id, linea.cantidad + 1)}
-                                        style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.1rem 0.4rem', cursor: 'pointer', color: 'var(--text)' }}
-                                      >+</button>
-                                    </div>
-                                  ) : (
-                                    linea.cantidad
+                            {d.lineas.map((linea) => {
+                              const style = linea.pagada ? { textDecoration: 'line-through', color: 'var(--text2)' } : {};
+                              return (
+                                <tr key={linea.id} style={style}>
+                                  {modoCobroActivo && (
+                                    <td style={{ textAlign: 'center' }}>
+                                      {linea.pagada ? (
+                                        <span title="Cobrado">✔️</span>
+                                      ) : (
+                                        <input
+                                          type="checkbox"
+                                          checked={!!lineasSeleccionadas[linea.id]}
+                                          onChange={() => toggleLinea(d, linea)}
+                                          style={{ cursor: 'pointer', scale: '1.2' }}
+                                        />
+                                      )}
+                                    </td>
                                   )}
-                                </td>
-                                <td style={{ textAlign: 'right' }}>${fmtBs(parseFloat(linea.precioUnit))}</td>
-                                <td style={{ textAlign: 'right' }}>${fmtBs(parseFloat(linea.subtotal))}</td>
-                                <td style={{ textAlign: 'right' }}>Bs {fmtBs(parseFloat(linea.subtotal) * tasaNum)}</td>
-                                {modoEdicionActivo && (
+                                  <td>{linea.productoNombre}</td>
                                   <td style={{ textAlign: 'center' }}>
-                                    <button
-                                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem' }}
-                                      onClick={() => handleEliminarLinea(d.id, linea.id)}
-                                      title="Eliminar producto"
-                                    >
-                                      ❌
-                                    </button>
+                                    {modoEdicionActivo && !linea.pagada ? (
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                                        <button 
+                                          onClick={() => handleCambiarCantidadLinea(d.id, linea.id, linea.cantidad - 1)}
+                                          style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.1rem 0.4rem', cursor: 'pointer', color: 'var(--text)' }}
+                                        >-</button>
+                                        <span style={{ minWidth: '1.5rem', textAlign: 'center' }}>{linea.cantidad}</span>
+                                        <button 
+                                          onClick={() => handleCambiarCantidadLinea(d.id, linea.id, linea.cantidad + 1)}
+                                          style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.1rem 0.4rem', cursor: 'pointer', color: 'var(--text)' }}
+                                        >+</button>
+                                      </div>
+                                    ) : (
+                                      linea.cantidad
+                                    )}
                                   </td>
-                                )}
-                              </tr>
-                            ))}
+                                  <td style={{ textAlign: 'right' }}>${fmtBs(parseFloat(linea.precioUnit))}</td>
+                                  <td style={{ textAlign: 'right' }}>${fmtBs(parseFloat(linea.subtotal))}</td>
+                                  <td style={{ textAlign: 'right' }}>Bs {fmtBs(parseFloat(linea.subtotal) * tasaNum)}</td>
+                                  {modoEdicionActivo && (
+                                    <td style={{ textAlign: 'center' }}>
+                                      {!linea.pagada && (
+                                        <button
+                                          style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem' }}
+                                          onClick={() => handleEliminarLinea(d.id, linea.id)}
+                                          title="Eliminar producto"
+                                        >
+                                          ❌
+                                        </button>
+                                      )}
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -770,6 +868,34 @@ export default function PanelDeudas() {
                 )}
               </>
             )}
+
+            {/* Cuadro de Observaciones (Fijo al final) */}
+            <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--text2)', fontWeight: '600' }}>
+                  📝 Observaciones del Cliente
+                </label>
+                <textarea
+                  value={observacionesLocales}
+                  onInput={e => setObservacionesLocales((e.target as HTMLTextAreaElement).value)}
+                  onBlur={handleBlurObservaciones}
+                  placeholder="Escribe notas, promesas de pago o detalles del cliente aquí... (Se guarda automáticamente al hacer clic fuera)"
+                  style={{
+                    width: '100%',
+                    minHeight: '80px',
+                    padding: '0.8rem',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg3)',
+                    color: 'var(--text)',
+                    fontSize: '0.9rem',
+                    resize: 'vertical',
+                    outline: 'none',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
+                  }}
+                />
+              </div>
+            </div>
           </>
         )}
 
@@ -790,7 +916,27 @@ export default function PanelDeudas() {
             onCerrar={() => setCreandoCliente(false)}
           />
         )}
+
+        {/* Modal Editar Cliente */}
+        {editandoCliente && clienteSeleccionado && (
+          <ModalCliente
+            initialNombre={clienteSeleccionado.nombre}
+            initialApellido={clienteSeleccionado.apellido}
+            initialTelefono={clienteSeleccionado.telefono || ''}
+            isEditing={true}
+            onConfirmar={handleEditarCliente}
+            onCerrar={() => setEditandoCliente(false)}
+          />
+        )}
       </main>
     </div>
+  );
+}
+
+export default function PanelDeudas() {
+  return (
+    <ErrorBoundary>
+      <PanelDeudasContenido />
+    </ErrorBoundary>
   );
 }

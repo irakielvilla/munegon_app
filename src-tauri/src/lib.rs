@@ -89,6 +89,8 @@ pub fn run() {
             commands::ventas::marcar_sincronizados,
             commands::ventas::guardar_datos_pull,
             sync_watcher::forzar_sincronizacion,
+            commands::ventas::procesar_avance_efectivo,
+            commands::ventas::procesar_compra_divisas,
             // Autenticación
             commands::ventas::verificar_pin,
             // Reportes PDF
@@ -99,6 +101,8 @@ pub fn run() {
             // Cuentas por Cobrar
             commands::ventas::listar_clientes,
             commands::ventas::crear_cliente,
+            commands::ventas::actualizar_cliente,
+            commands::ventas::actualizar_observaciones_cliente,
             commands::ventas::crear_deuda,
             commands::ventas::listar_deudas_cliente,
             commands::ventas::pagar_deudas_productos,

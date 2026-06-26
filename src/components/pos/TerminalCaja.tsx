@@ -7,6 +7,8 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { api } from '../../lib/api';
 import { getSession, destroySession } from '@lib/auth';
 import ModalOverlay from '../ui/ModalOverlay';
+import ModalAvanceEfectivo from '../caja/ModalAvanceEfectivo';
+import ModalCompraDivisas from '../caja/ModalCompraDivisas';
 
 // ── Tipos ────────────────────────────────────────────────────
 
@@ -659,6 +661,9 @@ export default function TerminalCaja() {
   const [procesando, setProcesando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
 
+  const [activeTab, setActiveTab] = useState<'productos' | 'servicios'>('productos');
+  const [modalServicio, setModalServicio] = useState<'ninguno' | 'avance' | 'divisas'>('ninguno');
+
   // Carga inicial
   useEffect(() => {
     cargarProductos();
@@ -730,6 +735,12 @@ export default function TerminalCaja() {
   // ── Totales ───────────────────────────────────────────────
 
   const tasaNum = parseFloat(config.tasa_cambio_bsd) || 1;
+  
+  const getProductPriceUSD = (p: Producto, currentTasa: number): number => {
+    const rawPrice = parseFloat(p.precio) || 0;
+    return p.monedaBase === 'BS' ? rawPrice / currentTasa : rawPrice;
+  };
+
   const subtotalUSD = carrito.reduce(
     (acc, l) => acc + getProductPriceUSD(l.producto, tasaNum) * l.cantidad,
     0,
@@ -738,7 +749,35 @@ export default function TerminalCaja() {
   const impuestoUSD = subtotalUSD * ivaPorc;
   const totalUSD = subtotalUSD + impuestoUSD;
 
-  // ── Pago ──────────────────────────────────────────────────
+  const procesarAvance = async (montoEfectivo: number, metodoPago: string, porcentaje: number) => {
+    setModalServicio('ninguno');
+    setProcesando(true);
+    try {
+      await api.procesar_avance_efectivo(session.usuarioId, montoEfectivo, metodoPago, porcentaje, config.tasa_cambio_bsd);
+      setMensaje({ tipo: 'ok', texto: '✅ Avance de Efectivo registrado' });
+    } catch (e) {
+      setMensaje({ tipo: 'error', texto: `❌ Error: ${e}` });
+    } finally {
+      setProcesando(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
+  };
+
+  const procesarDivisas = async (montoUsd: number, tasaAcordada: number, metodoPagoSalida: string, tasaSistema: string) => {
+    setModalServicio('ninguno');
+    setProcesando(true);
+    try {
+      await api.procesar_compra_divisas(session.usuarioId, montoUsd, tasaAcordada, metodoPagoSalida, tasaSistema);
+      setMensaje({ tipo: 'ok', texto: '✅ Compra de Divisas registrada' });
+    } catch (e) {
+      setMensaje({ tipo: 'error', texto: `❌ Error: ${e}` });
+    } finally {
+      setProcesando(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
+  };
+
+  // ── Totales y Pago ──────────────────────────────────────────────────
 
   const procesarPago = async (forma: FormaPago, referencia?: string, clienteId?: string) => {
     if (!session) return;
@@ -912,6 +951,34 @@ export default function TerminalCaja() {
             />
           </div>
 
+          <div class="caja-tabs" style={{ display: 'flex', gap: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+            <button
+              type="button"
+              class={activeTab === 'productos' ? 'btn-tab active' : 'btn-tab'}
+              onClick={() => setActiveTab('productos')}
+              style={{
+                flex: 1, padding: '0.8rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer',
+                background: activeTab === 'productos' ? 'var(--accent)' : 'var(--bg3)',
+                color: activeTab === 'productos' ? 'white' : 'var(--text)'
+              }}
+            >
+              📦 Productos
+            </button>
+            <button
+              type="button"
+              class={activeTab === 'servicios' ? 'btn-tab active' : 'btn-tab'}
+              onClick={() => setActiveTab('servicios')}
+              style={{
+                flex: 1, padding: '0.8rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer',
+                background: activeTab === 'servicios' ? 'var(--accent)' : 'var(--bg3)',
+                color: activeTab === 'servicios' ? 'white' : 'var(--text)'
+              }}
+            >
+              💼 Servicios
+            </button>
+          </div>
+
+          {activeTab === 'productos' && (
           <div class="productos-grid">
             {productosFiltrados.length === 0 ? (
               <div class="empty-state">
@@ -922,6 +989,7 @@ export default function TerminalCaja() {
                 const enCarrito = carrito.find((l) => l.producto.id === p.id);
                 return (
                   <button
+                    type="button"
                     key={p.id}
                     id={`prod-${p.id}`}
                     class={`producto-card ${enCarrito ? 'en-carrito' : ''}`}
@@ -948,13 +1016,29 @@ export default function TerminalCaja() {
                       </div>
                     </div>
                     {enCarrito && (
-                      <span class="prod-badge">{enCarrito.cantidad}</span>
+                      <div class="badge-cantidad">{enCarrito.cantidad}</div>
                     )}
                   </button>
                 );
               })
             )}
           </div>
+          )}
+
+          {activeTab === 'servicios' && (
+            <div class="servicios-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+              <button type="button" class="producto-card" onClick={() => setModalServicio('avance')}>
+                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>💸</span>
+                <span class="prod-nombre" style={{ fontSize: '1rem' }}>Avance de Efectivo</span>
+                <span class="prod-sku">Servicio Financiero</span>
+              </button>
+              <button type="button" class="producto-card" onClick={() => setModalServicio('divisas')}>
+                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>💵</span>
+                <span class="prod-nombre" style={{ fontSize: '1rem' }}>Compra de Divisas</span>
+                <span class="prod-sku">Servicio Financiero</span>
+              </button>
+            </div>
+          )}
         </section>
 
         {/* ── Panel Derecho: Carrito ── */}
@@ -1067,6 +1151,20 @@ export default function TerminalCaja() {
           tasa={config.tasa_cambio_bsd}
           onConfirmar={procesarCorteX}
           onCerrar={() => setModalActivo(null)}
+        />
+      )}
+
+      {modalServicio === 'avance' && (
+        <ModalAvanceEfectivo
+          onConfirmar={procesarAvance}
+          onCerrar={() => setModalServicio('ninguno')}
+        />
+      )}
+
+      {modalServicio === 'divisas' && (
+        <ModalCompraDivisas
+          onConfirmar={procesarDivisas}
+          onCerrar={() => setModalServicio('ninguno')}
         />
       )}
     </div>

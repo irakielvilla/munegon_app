@@ -365,7 +365,7 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, usuarioId, corteCajaId, subtotal, impuesto, total, formaPago,
-                    moneda, referenciaPago, tasaCambio, creadoEn
+                    moneda, referenciaPago, tasaCambio, creadoEn, esCobroDeuda, anulada
              FROM Venta WHERE isSynced = 0",
         )
         .map_err(|e| e.to_string())?;
@@ -384,6 +384,8 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
                 row.get::<_, Option<String>>(8)?,// referenciaPago
                 row.get::<_, Option<String>>(9)?,// tasaCambio
                 row.get::<_, String>(10)?,       // creadoEn
+                row.get::<_, bool>(11)?,         // esCobroDeuda
+                row.get::<_, bool>(12)?,         // anulada
             ))
         })
         .map_err(|e| e.to_string())?;
@@ -394,7 +396,7 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
     drop(stmt);
 
     let mut ventas_json = Vec::new();
-    for (id, usuario_id, corte_caja_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio, creado_en) in sales_list {
+    for (id, usuario_id, corte_caja_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio, creado_en, es_cobro_deuda, anulada) in sales_list {
         // Consultar las líneas de esta venta
         let mut lineas_stmt = conn.prepare(
             "SELECT id, ventaId, productoId, cantidad, precioUnit, subtotal 
@@ -420,7 +422,7 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
         ventas_json.push(serde_json::json!({
             "id": id,
             "usuarioId": usuario_id,
-            "corteCajaId": corte_caja_id, // ← incluido para que Supabase lo reciba en el upsert
+            "corteCajaId": corte_caja_id,
             "subtotal": subtotal,
             "impuesto": impuesto,
             "total": total,
@@ -429,6 +431,8 @@ pub fn obtener_ventas_pendientes() -> Result<Vec<serde_json::Value>, String> {
             "referenciaPago": referencia_pago,
             "tasaCambio": tasa_cambio,
             "creadoEn": creado_en,
+            "esCobroDeuda": es_cobro_deuda,
+            "anulada": anulada,
             "isSynced": false,
             "lineas": lineas
         }));
@@ -855,16 +859,19 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
             let referencia_pago = v["referenciaPago"].as_str(); // Option
             let tasa_cambio = v["tasaCambio"].as_str(); // Option
             let creado_en = v["creadoEn"].as_str().unwrap_or("");
+            let es_cobro_deuda = v["esCobroDeuda"].as_bool().unwrap_or(false) as i32;
+            let anulada = v["anulada"].as_bool().unwrap_or(false) as i32;
 
             let _ = tx.execute(
-                "INSERT INTO Venta (id, usuarioId, corteCajaId, subtotal, impuesto, total, formaPago, moneda, referenciaPago, tasaCambio, isSynced, creadoEn)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 1, ?11)
+                "INSERT INTO Venta (id, usuarioId, corteCajaId, subtotal, impuesto, total, formaPago, moneda, referenciaPago, tasaCambio, esCobroDeuda, anulada, isSynced, creadoEn)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, ?13)
                  ON CONFLICT(id) DO UPDATE SET 
                  usuarioId=excluded.usuarioId, corteCajaId=excluded.corteCajaId, subtotal=excluded.subtotal,
                  impuesto=excluded.impuesto, total=excluded.total, formaPago=excluded.formaPago,
                  moneda=excluded.moneda, referenciaPago=excluded.referenciaPago, tasaCambio=excluded.tasaCambio,
+                 esCobroDeuda=excluded.esCobroDeuda, anulada=excluded.anulada,
                  isSynced=1, creadoEn=excluded.creadoEn",
-                params![id, usuario_id, corte_caja_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio, creado_en],
+                params![id, usuario_id, corte_caja_id, subtotal, impuesto, total, forma_pago, moneda, referencia_pago, tasa_cambio, es_cobro_deuda, anulada, creado_en],
             );
         }
     }
@@ -914,16 +921,17 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
             let nombre = c["nombre"].as_str().unwrap_or("");
             let apellido = c["apellido"].as_str().unwrap_or("");
             let telefono = c["telefono"].as_str(); // Option
+            let observaciones = c["observaciones"].as_str(); // Option
             let activo = c["activo"].as_bool().unwrap_or(true) as i32;
             let creado_en = c["creadoEn"].as_str().unwrap_or("");
 
             let _ = tx.execute(
-                "INSERT INTO Cliente (id, nombre, apellido, telefono, activo, isSynced, creadoEn)
-                 VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6)
+                "INSERT INTO Cliente (id, nombre, apellido, telefono, observaciones, activo, isSynced, creadoEn)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7)
                  ON CONFLICT(id) DO UPDATE SET 
                  nombre=excluded.nombre, apellido=excluded.apellido, telefono=excluded.telefono,
-                 activo=excluded.activo, isSynced=1, creadoEn=excluded.creadoEn",
-                params![id, nombre, apellido, telefono, activo, creado_en],
+                 observaciones=excluded.observaciones, activo=excluded.activo, isSynced=1, creadoEn=excluded.creadoEn",
+                params![id, nombre, apellido, telefono, observaciones, activo, creado_en],
             );
         }
     }
@@ -992,6 +1000,7 @@ pub struct ClienteInfo {
     pub nombre: String,
     pub apellido: String,
     pub telefono: Option<String>,
+    pub observaciones: Option<String>,
     pub activo: bool,
 }
 
@@ -1004,6 +1013,7 @@ pub struct LineaDeudaInfo {
     pub cantidad: i64,
     pub precio_unit: String,
     pub subtotal: String,
+    pub pagada: bool,
 }
 
 #[derive(Serialize)]
@@ -1016,6 +1026,7 @@ pub struct DeudaInfo {
     pub impuesto: String,
     pub total: String,
     pub creado_en: String,
+    pub pagada: bool,
     pub lineas: Vec<LineaDeudaInfo>,
 }
 
@@ -1023,7 +1034,7 @@ pub struct DeudaInfo {
 pub fn listar_clientes() -> Result<Vec<ClienteInfo>, String> {
     let conn = open_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, nombre, apellido, telefono, activo FROM Cliente WHERE activo = 1 ORDER BY nombre ASC")
+        .prepare("SELECT id, nombre, apellido, telefono, activo, observaciones FROM Cliente WHERE activo = 1 ORDER BY nombre ASC")
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
@@ -1034,6 +1045,7 @@ pub fn listar_clientes() -> Result<Vec<ClienteInfo>, String> {
                 apellido: row.get(2)?,
                 telefono: row.get(3)?,
                 activo: row.get::<_, i32>(4)? == 1,
+                observaciones: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -1046,12 +1058,34 @@ pub fn crear_cliente(nombre: String, apellido: String, telefono: Option<String>)
     let conn = open_db().map_err(|e| e.to_string())?;
     let id = Uuid::new_v4().to_string();
     conn.execute(
-        "INSERT INTO Cliente (id, nombre, apellido, telefono, activo, creadoEn, isSynced)
-         VALUES (?1, ?2, ?3, ?4, 1, datetime('now'), 0)",
+        "INSERT INTO Cliente (id, nombre, apellido, telefono, activo, creadoEn, isSynced, observaciones)
+         VALUES (?1, ?2, ?3, ?4, 1, datetime('now'), 0, NULL)",
         params![id, nombre, apellido, telefono],
     )
     .map_err(|e| e.to_string())?;
     Ok(id)
+}
+
+#[tauri::command]
+pub fn actualizar_cliente(id: String, nombre: String, apellido: String, telefono: Option<String>) -> Result<(), String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE Cliente SET nombre = ?1, apellido = ?2, telefono = ?3, isSynced = 0 WHERE id = ?4",
+        params![nombre, apellido, telefono, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn actualizar_observaciones_cliente(id: String, observaciones: String) -> Result<(), String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE Cliente SET observaciones = ?1, isSynced = 0 WHERE id = ?2",
+        params![observaciones, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -1103,10 +1137,10 @@ pub fn listar_deudas_cliente(cliente_id: String) -> Result<Vec<DeudaInfo>, Strin
     // Obtener todas las deudas del cliente
     let mut stmt = conn
         .prepare(
-            "SELECT d.id, d.usuarioId, u.nombre, d.subtotal, d.impuesto, d.total, d.creadoEn
+            "SELECT d.id, d.usuarioId, u.nombre, d.subtotal, d.impuesto, d.total, d.creadoEn, d.activo
              FROM Deuda d
              JOIN Usuario u ON d.usuarioId = u.id
-             WHERE d.clienteId = ?1 AND d.activo = 1
+             WHERE d.clienteId = ?1 AND d.anulada = 0
              ORDER BY d.creadoEn DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -1121,6 +1155,7 @@ pub fn listar_deudas_cliente(cliente_id: String) -> Result<Vec<DeudaInfo>, Strin
                 row.get::<_, String>(4)?, // impuesto
                 row.get::<_, String>(5)?, // total
                 row.get::<_, String>(6)?, // creadoEn
+                row.get::<_, i32>(7)? == 0, // pagada (si activo == 0, está pagada)
             ))
         })
         .map_err(|e| e.to_string())?;
@@ -1130,14 +1165,14 @@ pub fn listar_deudas_cliente(cliente_id: String) -> Result<Vec<DeudaInfo>, Strin
 
     let mut resultado = Vec::new();
 
-    for (id, usuario_id, usuario_nombre, subtotal, impuesto, total, creado_en) in deudas_raw {
+    for (id, usuario_id, usuario_nombre, subtotal, impuesto, total, creado_en, pagada) in deudas_raw {
         // Obtener las líneas de esta deuda
         let mut lineas_stmt = conn
             .prepare(
-                "SELECT ld.id, ld.productoId, p.nombre, ld.cantidad, ld.precioUnit, ld.subtotal
+                "SELECT ld.id, ld.productoId, p.nombre, ld.cantidad, ld.precioUnit, ld.subtotal, ld.activo
                  FROM LineaDeuda ld
                  JOIN Producto p ON ld.productoId = p.id
-                 WHERE ld.deudaId = ?1 AND ld.activo = 1",
+                 WHERE ld.deudaId = ?1 AND ld.anulada = 0",
             )
             .map_err(|e| e.to_string())?;
 
@@ -1150,6 +1185,7 @@ pub fn listar_deudas_cliente(cliente_id: String) -> Result<Vec<DeudaInfo>, Strin
                     cantidad: row.get(3)?,
                     precio_unit: row.get(4)?,
                     subtotal: row.get(5)?,
+                    pagada: row.get::<_, i32>(6)? == 0,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -1167,6 +1203,7 @@ pub fn listar_deudas_cliente(cliente_id: String) -> Result<Vec<DeudaInfo>, Strin
             impuesto,
             total,
             creado_en,
+            pagada,
             lineas,
         });
     }
@@ -1514,7 +1551,7 @@ pub fn actualizar_cantidad_linea_deuda(deuda_id: String, linea_id: String, nueva
 pub fn obtener_clientes_pendientes() -> Result<Vec<serde_json::Value>, String> {
     let conn = open_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, nombre, apellido, telefono, activo, creadoEn FROM Cliente WHERE isSynced = 0")
+        .prepare("SELECT id, nombre, apellido, telefono, activo, creadoEn, observaciones FROM Cliente WHERE isSynced = 0")
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
@@ -1526,6 +1563,7 @@ pub fn obtener_clientes_pendientes() -> Result<Vec<serde_json::Value>, String> {
                 "telefono": row.get::<_, Option<String>>(3)?,
                 "activo": row.get::<_, i32>(4)? == 1,
                 "creadoEn": row.get::<_, String>(5)?,
+                "observaciones": row.get::<_, Option<String>>(6)?,
             }))
         })
         .map_err(|e| e.to_string())?;
@@ -1596,4 +1634,64 @@ pub fn obtener_deudas_pendientes() -> Result<Vec<serde_json::Value>, String> {
         }
     }
     Ok(deudas)
+}
+
+#[tauri::command]
+pub fn procesar_avance_efectivo(
+    usuario_id: String,
+    monto_efectivo: f64,
+    metodo_pago: String,
+    porcentaje: f64,
+    tasa_cambio: String,
+) -> Result<(), String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    
+    // 1. Salida de efectivo (Venta negativa)
+    let id_salida = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO Venta (id, usuarioId, subtotal, impuesto, total, formaPago, moneda, tasaCambio, creadoEn, isSynced, esCobroDeuda)
+         VALUES (?1, ?2, ?3, '0', ?3, 'BS_EFECTIVO', 'BS', ?4, datetime('now'), 0, 0)",
+        rusqlite::params![id_salida, usuario_id, format!("{:.2}", -monto_efectivo), tasa_cambio],
+    ).map_err(|e| e.to_string())?;
+    
+    // 2. Ingreso electrónico (Venta positiva + comisión)
+    let total_cobrar = monto_efectivo + (monto_efectivo * porcentaje / 100.0);
+    let id_ingreso = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO Venta (id, usuarioId, subtotal, impuesto, total, formaPago, moneda, tasaCambio, creadoEn, isSynced, esCobroDeuda)
+         VALUES (?1, ?2, ?3, '0', ?3, ?4, 'BS', ?5, datetime('now'), 0, 0)",
+        rusqlite::params![id_ingreso, usuario_id, format!("{:.2}", total_cobrar), metodo_pago, tasa_cambio],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub fn procesar_compra_divisas(
+    usuario_id: String,
+    monto_usd: f64,
+    tasa_acordada: f64,
+    metodo_pago_salida: String,
+    tasa_cambio_sistema: String,
+) -> Result<(), String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    
+    // 1. Ingreso de USD efectivo
+    let id_ingreso = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO Venta (id, usuarioId, subtotal, impuesto, total, formaPago, moneda, tasaCambio, creadoEn, isSynced, esCobroDeuda)
+         VALUES (?1, ?2, ?3, '0', ?3, 'USD_EFECTIVO', 'USD', ?4, datetime('now'), 0, 0)",
+        rusqlite::params![id_ingreso, usuario_id, format!("{:.2}", monto_usd), tasa_cambio_sistema],
+    ).map_err(|e| e.to_string())?;
+    
+    // 2. Salida de Bolívares (Venta negativa)
+    let monto_bs_salida = monto_usd * tasa_acordada;
+    let id_salida = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO Venta (id, usuarioId, subtotal, impuesto, total, formaPago, moneda, tasaCambio, creadoEn, isSynced, esCobroDeuda)
+         VALUES (?1, ?2, ?3, '0', ?3, ?4, 'BS', ?5, datetime('now'), 0, 0)",
+        rusqlite::params![id_salida, usuario_id, format!("{:.2}", -monto_bs_salida), metodo_pago_salida, tasa_cambio_sistema],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(())
 }

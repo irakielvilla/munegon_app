@@ -83,6 +83,7 @@ export interface ClienteInfo {
   nombre: string;
   apellido: string;
   telefono: string | null;
+  observaciones?: string | null;
   activo: boolean;
 }
 
@@ -157,6 +158,16 @@ export const api = {
     throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
   },
 
+  actualizar_cliente: async (id: string, nombre: string, apellido: string, telefono?: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('actualizar_cliente', { id, nombre, apellido, telefono: telefono || null });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  actualizar_observaciones_cliente: async (id: string, observaciones: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('actualizar_observaciones_cliente', { id, observaciones });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
   crear_deuda: async (payload: {
     clienteId: string;
     usuarioId: string;
@@ -205,6 +216,34 @@ export const api = {
     if (isTauri()) return invokeTauri<void>('actualizar_cantidad_linea_deuda', { deudaId, lineaId, nuevaCantidad });
     throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
   },
+
+  // ── SERVICIOS: Transacciones Independientes ──
+  procesar_avance_efectivo: async (usuarioId: string, montoEfectivo: number, metodoPago: string, porcentaje: number, tasaCambio: string): Promise<void> => {
+    if (isTauri()) {
+      return invokeTauri<void>('procesar_avance_efectivo', {
+        usuarioId,
+        montoEfectivo,
+        metodoPago,
+        porcentaje,
+        tasaCambio
+      });
+    }
+    throw new Error('Solo disponible en Tauri');
+  },
+
+  procesar_compra_divisas: async (usuarioId: string, montoUsd: number, tasaAcordada: number, metodoPagoSalida: string, tasaCambioSistema: string): Promise<void> => {
+    if (isTauri()) {
+      return invokeTauri<void>('procesar_compra_divisas', {
+        usuarioId,
+        montoUsd,
+        tasaAcordada,
+        metodoPagoSalida,
+        tasaCambioSistema
+      });
+    }
+    throw new Error('Solo disponible en Tauri');
+  },
+
 
   // ── USUARIOS ──
   listar_usuarios: async (): Promise<Usuario[]> => {

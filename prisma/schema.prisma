@@ -161,10 +161,11 @@ model LogCambio {
 model Cliente {
   id        String   @id @default(uuid())
   nombre    String
-  apellido  String
-  telefono  String?
-  activo    Boolean  @default(true)
-  creadoEn  DateTime @default(now())
+  apellido      String
+  telefono      String?
+  observaciones String?
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
   isSynced  Boolean  @default(false)
 
   deudas    Deuda[]
