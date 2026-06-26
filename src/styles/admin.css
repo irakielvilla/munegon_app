@@ -565,8 +565,9 @@ body {
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: 1.5rem;
-  height: calc(100vh - 100px);
+  height: 100vh;
   padding: 1rem;
+  box-sizing: border-box;
 }
 
 .deudas-sidebar {

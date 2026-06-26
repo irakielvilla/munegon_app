@@ -290,6 +290,7 @@ function PanelDeudasContenido() {
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [editandoCliente, setEditandoCliente] = useState(false);
   const [mostrarPagados, setMostrarPagados] = useState(true);
+  const [mostrarObservaciones, setMostrarObservaciones] = useState(false);
 
   const handleCrearCliente = async (nombre: string, apellido: string, telefono?: string) => {
     const id = await api.crear_cliente(nombre, apellido, telefono);
@@ -872,28 +873,39 @@ function PanelDeudasContenido() {
             {/* Cuadro de Observaciones (Fijo al final) */}
             <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text2)', fontWeight: '600' }}>
-                  📝 Observaciones del Cliente
-                </label>
-                <textarea
-                  value={observacionesLocales}
-                  onInput={e => setObservacionesLocales((e.target as HTMLTextAreaElement).value)}
-                  onBlur={handleBlurObservaciones}
-                  placeholder="Escribe notas, promesas de pago o detalles del cliente aquí... (Se guarda automáticamente al hacer clic fuera)"
-                  style={{
-                    width: '100%',
-                    minHeight: '80px',
-                    padding: '0.8rem',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg3)',
-                    color: 'var(--text)',
-                    fontSize: '0.9rem',
-                    resize: 'vertical',
-                    outline: 'none',
-                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
-                  }}
-                />
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '0.2rem 0' }}
+                  onClick={() => setMostrarObservaciones(!mostrarObservaciones)}
+                >
+                  <label style={{ fontSize: '0.85rem', color: 'var(--text2)', fontWeight: '600', cursor: 'pointer', margin: 0 }}>
+                    📝 Observaciones del Cliente
+                  </label>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text2)', userSelect: 'none' }}>
+                    {mostrarObservaciones ? '▲ Ocultar' : '▼ Mostrar'}
+                  </span>
+                </div>
+                {mostrarObservaciones && (
+                  <textarea
+                    value={observacionesLocales}
+                    onInput={e => setObservacionesLocales((e.target as HTMLTextAreaElement).value)}
+                    onBlur={handleBlurObservaciones}
+                    placeholder="Escribe notas, promesas de pago o detalles del cliente aquí... (Se guarda automáticamente al hacer clic fuera)"
+                    style={{
+                      width: '100%',
+                      minHeight: '80px',
+                      padding: '0.8rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg3)',
+                      color: 'var(--text)',
+                      fontSize: '0.9rem',
+                      resize: 'vertical',
+                      outline: 'none',
+                      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)',
+                      marginTop: '0.5rem'
+                    }}
+                  />
+                )}
               </div>
             </div>
           </>
