@@ -673,7 +673,7 @@ export default function TerminalCaja() {
   const cargarProductos = async () => {
     try {
       const data = await api.listar_productos();
-      setProductos(data.filter((p) => p.activo && p.stock > 0));
+      setProductos(data.filter((p) => p.activo));
     } catch (e) {
       console.error('Error cargando productos:', e);
     }
@@ -691,6 +691,7 @@ export default function TerminalCaja() {
   // ── Carrito ───────────────────────────────────────────────
 
   const agregarAlCarrito = useCallback((producto: Producto) => {
+    if (producto.stock <= 0) return;
     setCarrito((prev) => {
       const idx = prev.findIndex((l) => l.producto.id === producto.id);
       if (idx >= 0) {
@@ -987,18 +988,20 @@ export default function TerminalCaja() {
             ) : (
               productosFiltrados.map((p) => {
                 const enCarrito = carrito.find((l) => l.producto.id === p.id);
+                const agotado = p.stock <= 0;
                 return (
                   <button
                     type="button"
                     key={p.id}
                     id={`prod-${p.id}`}
-                    class={`producto-card ${enCarrito ? 'en-carrito' : ''}`}
+                    class={`producto-card ${enCarrito ? 'en-carrito' : ''} ${agotado ? 'producto-agotado' : ''}`}
                     onClick={() => agregarAlCarrito(p)}
+                    disabled={agotado}
                   >
                     <span class="prod-nombre">{p.nombre}</span>
                     <span class="prod-sku">{p.sku}</span>
-                    <span class={`prod-stock ${p.stock <= 5 ? 'stock-bajo' : ''}`}>
-                      Stock: {p.stock}
+                    <span class={`prod-stock ${agotado ? 'stock-agotado' : p.stock <= 5 ? 'stock-bajo' : ''}`}>
+                      {agotado ? 'AGOTADO' : `Stock: ${p.stock}`}
                     </span>
                     <div class="prod-footer">
                       <div class="prod-precio-container">

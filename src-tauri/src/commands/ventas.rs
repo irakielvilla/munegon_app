@@ -96,7 +96,7 @@ pub fn listar_productos() -> Result<Vec<Producto>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, sku, nombre, descripcion, monedaBase, precio, stock, stockMinimo, activo
-             FROM Producto WHERE activo = 1 AND stock > 0
+             FROM Producto WHERE activo = 1
              ORDER BY nombre ASC",
         )
         .map_err(|e| e.to_string())?;
