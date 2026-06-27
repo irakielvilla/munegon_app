@@ -39,6 +39,7 @@ interface ClienteInfo {
   apellido: string;
   telefono: string | null;
   activo: boolean;
+  observaciones?: string | null;
 }
 
 interface LineaDeudaInfo {
@@ -389,8 +390,21 @@ function PanelDeudasContenido() {
 
       const mapTotales: Record<string, number> = {};
       for (const c of lista) {
-        const dList = await api.listar_deudas_cliente(c.id);
-        const total = dList.reduce((acc, curr) => acc + parseFloat(curr.total), 0);
+        const dList = await api.listar_deudas_cliente(c.id) as unknown as DeudaInfo[];
+        let total = 0;
+        for (const deuda of dList) {
+          if (!deuda.pagada) {
+            const origSubtotal = parseFloat(deuda.subtotal) || 1;
+            const origImpuesto = parseFloat(deuda.impuesto) || 0;
+            const ratio = origImpuesto / origSubtotal;
+            for (const linea of deuda.lineas) {
+              if (!linea.pagada) {
+                const lineaSubtotal = parseFloat(linea.subtotal) || 0;
+                total += lineaSubtotal + (lineaSubtotal * ratio);
+              }
+            }
+          }
+        }
         mapTotales[c.id] = total;
       }
       setTotalesCliente(mapTotales);
@@ -415,7 +429,7 @@ function PanelDeudasContenido() {
     setLineasSeleccionadas({});
     try {
       const dList = await api.listar_deudas_cliente(cliente.id);
-      setDeudas(dList);
+      setDeudas(dList as unknown as DeudaInfo[]);
     } catch (e) {
       console.error('Error cargando deudas del cliente:', e);
     } finally {
