@@ -101,6 +101,8 @@ export default function TablaInventario() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [soloStockBajo, setSoloStockBajo] = useState(false);
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activos' | 'inactivos'>('todos');
+  const [filtroMoneda, setFiltroMoneda] = useState<'todos' | 'BS' | 'USD'>('todos');
   const [modal, setModal] = useState<ModalMode>(null);
   const [editTarget, setEditTarget] = useState<Producto | null>(null);
   const [form, setForm] = useState(emptyProducto());
@@ -274,8 +276,19 @@ export default function TablaInventario() {
       busqueda === '' ||
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.sku.toLowerCase().includes(busqueda.toLowerCase());
+
     const matchStock = !soloStockBajo || p.stock <= p.stockMinimo;
-    return matchBusqueda && matchStock;
+
+    const matchEstado =
+      filtroEstado === 'todos' ||
+      (filtroEstado === 'activos' && p.activo) ||
+      (filtroEstado === 'inactivos' && !p.activo);
+
+    const matchMoneda =
+      filtroMoneda === 'todos' ||
+      p.monedaBase === filtroMoneda;
+
+    return matchBusqueda && matchStock && matchEstado && matchMoneda;
   });
 
   const setField = (key: keyof typeof form, val: string | number) =>
@@ -295,18 +308,33 @@ export default function TablaInventario() {
             onInput={(e) => setBusqueda((e.target as HTMLInputElement).value)}
           />
         </div>
-        <label class="stock-toggle">
-          <input
-            id="filtro-stock-bajo"
-            type="checkbox"
-            checked={soloStockBajo}
-            onChange={(e) => setSoloStockBajo((e.target as HTMLInputElement).checked)}
-          />
-          ⚠️ Solo stock bajo
-        </label>
+
         <button id="btn-nuevo-producto" class="btn-nuevo" onClick={abrirNuevo}>
           + Nuevo Producto
         </button>
+      </div>
+
+      <div class="inv-filtros-chips" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0rem', padding: '0 1rem' }}>
+        <button
+          onClick={() => setFiltroEstado(f => f === 'activos' ? 'todos' : 'activos')}
+          style={{ background: filtroEstado === 'activos' ? 'var(--accent)' : 'var(--bg3)', color: filtroEstado === 'activos' ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+        >Activos</button>
+        <button
+          onClick={() => setFiltroEstado(f => f === 'inactivos' ? 'todos' : 'inactivos')}
+          style={{ background: filtroEstado === 'inactivos' ? 'var(--accent)' : 'var(--bg3)', color: filtroEstado === 'inactivos' ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+        >Inactivos</button>
+        <button
+          onClick={() => setFiltroMoneda(f => f === 'BS' ? 'todos' : 'BS')}
+          style={{ background: filtroMoneda === 'BS' ? 'var(--accent)' : 'var(--bg3)', color: filtroMoneda === 'BS' ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+        >Solo Bs</button>
+        <button
+          onClick={() => setFiltroMoneda(f => f === 'USD' ? 'todos' : 'USD')}
+          style={{ background: filtroMoneda === 'USD' ? 'var(--accent)' : 'var(--bg3)', color: filtroMoneda === 'USD' ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+        >Solo $</button>
+        <button
+          onClick={() => setSoloStockBajo(!soloStockBajo)}
+          style={{ background: soloStockBajo ? 'var(--accent)' : 'var(--bg3)', color: soloStockBajo ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+        >⚠️ Stock Bajo</button>
       </div>
 
       {/* ── Flash ── */}
