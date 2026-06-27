@@ -208,7 +208,7 @@ function ModalCliente({ initialNombre = '', initialApellido = '', initialTelefon
     try {
       await onConfirmar(nuevoNombre.trim(), nuevoApellido.trim(), nuevoTelefono.trim() || undefined);
       onCerrar();
-    } catch(e) {
+    } catch (e) {
       alert(`Error ${isEditing ? 'editando' : 'creando'} cliente: ${e}`);
     } finally {
       setProcesando(false);
@@ -285,13 +285,15 @@ function PanelDeudasContenido() {
   const [lineasSeleccionadas, setLineasSeleccionadas] = useState<Record<string, { deudaId: string; subtotal: number; impuesto: number }>>({});
   const [modalPagoOpen, setModalPagoOpen] = useState(false);
   const [procesando, setProcesando] = useState(false);
-  
+
   // Estados de edición y gestión
   const [modoEdicionActivo, setModoEdicionActivo] = useState(false);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [editandoCliente, setEditandoCliente] = useState(false);
   const [mostrarPagados, setMostrarPagados] = useState(true);
   const [mostrarObservaciones, setMostrarObservaciones] = useState(false);
+  const [modalWA, setModalWA] = useState(false);
+  const [textoWA, setTextoWA] = useState('');
 
   const handleCrearCliente = async (nombre: string, apellido: string, telefono?: string) => {
     const id = await api.crear_cliente(nombre, apellido, telefono);
@@ -542,6 +544,8 @@ function PanelDeudasContenido() {
     ? (totalesCliente[clienteSeleccionado.id] || 0)
     : 0;
 
+  const totalGlobal = Object.values(totalesCliente).reduce((acc, curr) => acc + curr, 0);
+
   const tasaNum = parseFloat(config.tasa_cambio_bsd) || 1;
 
   // Totales de la selección actual
@@ -551,31 +555,82 @@ function PanelDeudasContenido() {
 
   // Filtrar clientes
   const term = busqueda.toLowerCase().trim();
-  const clientesFiltrados = term === '' 
-    ? clientes 
-    : clientes.filter(c => 
-        c.nombre.toLowerCase().includes(term) || 
-        c.apellido.toLowerCase().includes(term) ||
-        (c.telefono && c.telefono.includes(term))
-      );
+  const clientesFiltrados = term === ''
+    ? clientes
+    : clientes.filter(c =>
+      c.nombre.toLowerCase().includes(term) ||
+      c.apellido.toLowerCase().includes(term) ||
+      (c.telefono && c.telefono.includes(term))
+    );
 
-  const deudasVisibles = mostrarPagados 
-    ? deudas 
+  const deudasVisibles = mostrarPagados
+    ? deudas
     : deudas
-        .map(d => ({ ...d, lineas: d.lineas.filter(l => !l.pagada) }))
-        .filter(d => !d.pagada && d.lineas.length > 0);
+      .map(d => ({ ...d, lineas: d.lineas.filter(l => !l.pagada) }))
+      .filter(d => !d.pagada && d.lineas.length > 0);
+
+  const generarMensajeWhatsApp = () => {
+    if (!clienteSeleccionado) return;
+
+    const deudasPendientes = deudasVisibles.filter(d => !d.pagada && d.lineas.some(l => !l.pagada));
+    if (deudasPendientes.length === 0) {
+      alert('No hay deudas pendientes para generar un resumen.');
+      return;
+    }
+
+    let mensaje = `Hola 👋 ${clienteSeleccionado.nombre} ${clienteSeleccionado.apellido},\nAquí tienes el detalle de tu deuda pendiente:\n\n`;
+
+    const grupos: Record<string, { lineas: LineaDeudaInfo[], subtotal: number }> = {};
+    for (const d of deudasPendientes) {
+      const fecha = formatFecha(d.creadoEn).split(' a las ')[0];
+      if (!grupos[fecha]) grupos[fecha] = { lineas: [], subtotal: 0 };
+
+      for (const l of d.lineas) {
+        if (!l.pagada) {
+          grupos[fecha].lineas.push(l);
+          const ratio = (parseFloat(d.impuesto) || 0) / (parseFloat(d.subtotal) || 1);
+          const lTotal = (parseFloat(l.subtotal) || 0) * (1 + ratio);
+          grupos[fecha].subtotal += lTotal;
+        }
+      }
+    }
+
+    for (const [fecha, data] of Object.entries(grupos)) {
+      if (data.lineas.length === 0) continue;
+      mensaje += `📅 Fecha: ${fecha}\n`;
+      data.lineas.forEach((l, i) => {
+        const rombo = i % 2 === 0 ? '🔸' : '🔹';
+        mensaje += `${rombo} ${l.cantidad}x ${l.productoNombre}\n`;
+      });
+      mensaje += `Subtotal del día: $${fmtBs(data.subtotal)} ❗\n\n`;
+    }
+
+    mensaje += `-----------------------------------\n`;
+    mensaje += `Total Deuda Acumulada: $${fmtBs(totalAcumulado)} USD ❗❗\n`;
+
+    setTextoWA(mensaje);
+    setModalWA(true);
+  };
 
   return (
     <div class="deudas-container">
-      {/* Lateral izquierdo: Lista de clientes deudores */}
-      <aside class="deudas-sidebar">
-        <div class="deudas-sidebar-header">
-          👥 Clientes Deudores
+      {/* Columna izquierda */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', minHeight: 0 }}>
+        {/* Nuevo contenedor: Total General por Cobrar */}
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.2rem', flexShrink: 0 }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text2)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total por Cobrar</span>
+          <strong style={{ fontSize: '1.8rem', color: 'var(--accent2)', fontWeight: '800' }}>${fmtBs(totalGlobal)}</strong>
+        </div>
+
+        {/* Lateral izquierdo: Lista de clientes deudores */}
+        <aside class="deudas-sidebar" style={{ flex: 1, minHeight: 0 }}>
+          <div class="deudas-sidebar-header">
+            👥 Clientes Deudores
         </div>
         <div class="deudas-search-container" style={{ padding: '0.8rem', borderBottom: '1px solid var(--border)' }}>
-          <input 
-            type="text" 
-            placeholder="Buscar por nombre o teléfono..." 
+          <input
+            type="text"
+            placeholder="Buscar por nombre o teléfono..."
             value={busqueda}
             onInput={(e) => setBusqueda((e.target as HTMLInputElement).value)}
             style={{
@@ -653,7 +708,8 @@ function PanelDeudasContenido() {
             🗑️ Borrar Cliente
           </button>
         </div>
-      </aside>
+        </aside>
+      </div>
 
       {/* Pane central: Detalle de deudas del cliente seleccionado */}
       <main class="deudas-main">
@@ -675,9 +731,15 @@ function PanelDeudasContenido() {
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div class="deudas-total-acumulado">
-                  <span>Deuda Total Pendiente</span>
-                  <strong>${fmtBs(totalAcumulado)} USD</strong>
+                <div class="deudas-total-acumulado" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <span style={{ fontSize: '0.8rem' }}>Deuda Total Pendiente</span>
+                  <strong style={{ fontSize: '1.2rem' }}>${fmtBs(totalAcumulado)} USD</strong>
+                  <button
+                    onClick={generarMensajeWhatsApp}
+                    style={{ background: '#25D366', color: 'black', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer', marginTop: '0.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', fontWeight: 'bold' }}
+                  >
+                    💬 Resumen WhatsApp
+                  </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginRight: '1rem' }}>
                   <label style={{ fontSize: '0.85rem', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -802,12 +864,12 @@ function PanelDeudasContenido() {
                                   <td style={{ textAlign: 'center' }}>
                                     {modoEdicionActivo && !linea.pagada ? (
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                                        <button 
+                                        <button
                                           onClick={() => handleCambiarCantidadLinea(d.id, linea.id, linea.cantidad - 1)}
                                           style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.1rem 0.4rem', cursor: 'pointer', color: 'var(--text)' }}
                                         >-</button>
                                         <span style={{ minWidth: '1.5rem', textAlign: 'center' }}>{linea.cantidad}</span>
-                                        <button 
+                                        <button
                                           onClick={() => handleCambiarCantidadLinea(d.id, linea.id, linea.cantidad + 1)}
                                           style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '4px', padding: '0.1rem 0.4rem', cursor: 'pointer', color: 'var(--text)' }}
                                         >+</button>
@@ -953,6 +1015,36 @@ function PanelDeudasContenido() {
             onConfirmar={handleEditarCliente}
             onCerrar={() => setEditandoCliente(false)}
           />
+        )}
+
+        {/* Modal Resumen WhatsApp */}
+        {modalWA && (
+          <ModalOverlay>
+            <div class="modal-card" style={{ minWidth: '550px', minHeight: '600px' }}>
+              <div class="modal-header">
+                <h2>💬 Resumen de Deuda</h2>
+                <button class="modal-close" onClick={() => setModalWA(false)}>✕</button>
+              </div>
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Copia este mensaje y envíalo al cliente por WhatsApp:</p>
+                <textarea
+                  value={textoWA}
+                  readOnly
+                  style={{ width: '100%', height: '350px', padding: '0.8rem', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '0.9rem', resize: 'none' }}
+                />
+                <button
+                  class="btn-confirmar"
+                  onClick={() => {
+                    navigator.clipboard.writeText(textoWA);
+                    alert('¡Mensaje copiado al portapapeles!');
+                  }}
+                  style={{ background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                >
+                  📋 Copiar Mensaje
+                </button>
+              </div>
+            </div>
+          </ModalOverlay>
         )}
       </main>
     </div>
