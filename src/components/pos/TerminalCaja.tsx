@@ -1032,11 +1032,13 @@ export default function TerminalCaja() {
                 <span class="prod-nombre" style={{ fontSize: '1rem' }}>Avance de Efectivo</span>
                 <span class="prod-sku">Servicio Financiero</span>
               </button>
+              {/* Opción de Compra de Divisas desactivada temporalmente a petición del usuario
               <button type="button" class="producto-card" onClick={() => setModalServicio('divisas')}>
                 <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>💵</span>
                 <span class="prod-nombre" style={{ fontSize: '1rem' }}>Compra de Divisas</span>
                 <span class="prod-sku">Servicio Financiero</span>
               </button>
+              */}
             </div>
           )}
         </section>
