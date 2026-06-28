@@ -731,9 +731,9 @@ function PanelDeudasContenido() {
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div class="deudas-total-acumulado" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                <div class="deudas-total-acumulado" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.8rem' }}>Deuda Total</span>
-                  <strong style={{ fontSize: '1.2rem' }}>${fmtBs(totalAcumulado)} USD</strong>
+                  <strong style={{ fontSize: '1.2rem' }}>${fmtBs(totalAcumulado)}</strong>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginRight: '1rem' }}>
                   <label style={{ fontSize: '0.85rem', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
