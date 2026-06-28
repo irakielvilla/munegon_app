@@ -1045,8 +1045,11 @@ function PanelDeudasContenido() {
                 <button
                   class="btn-confirmar"
                   onClick={() => {
-                    navigator.clipboard.writeText(textoWA);
-                    alert('¡Mensaje copiado al portapapeles!');
+                    navigator.clipboard.writeText(textoWA).then(() => {
+                      alert('¡Mensaje copiado al portapapeles!');
+                    }).catch(err => {
+                      console.error('Error al copiar al portapapeles: ', err);
+                    });
                   }}
                   style={{ background: '#25D366', color: 'black', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 >
