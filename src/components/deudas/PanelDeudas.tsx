@@ -615,9 +615,9 @@ function PanelDeudasContenido() {
   return (
     <div class="deudas-container">
       {/* Columna izquierda */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', height: '100%', minHeight: 0 }}>
         {/* Nuevo contenedor: Total General por Cobrar */}
-        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.2rem', flexShrink: 0 }}>
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '0.25rem 1rem 0.25rem 1rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.2rem', flexShrink: 0 }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text2)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total por Cobrar</span>
           <strong style={{ fontSize: '1.8rem', color: 'var(--accent2)', fontWeight: '800' }}>${fmtBs(totalGlobal)}</strong>
         </div>
@@ -626,88 +626,88 @@ function PanelDeudasContenido() {
         <aside class="deudas-sidebar" style={{ flex: 1, minHeight: 0 }}>
           <div class="deudas-sidebar-header">
             👥 Clientes Deudores
-        </div>
-        <div class="deudas-search-container" style={{ padding: '0.8rem', borderBottom: '1px solid var(--border)' }}>
-          <input
-            type="text"
-            placeholder="Buscar por nombre o teléfono..."
-            value={busqueda}
-            onInput={(e) => setBusqueda((e.target as HTMLInputElement).value)}
-            style={{
-              width: '100%',
-              padding: '0.6rem 0.8rem',
-              borderRadius: '6px',
-              border: '1px solid var(--border-subtle)',
-              background: 'var(--bg3)',
-              color: 'var(--text)',
-              fontSize: '0.9rem',
-              outline: 'none'
-            }}
-          />
-        </div>
-        <div class="deudas-client-list">
-          {cargandoLista && clientesFiltrados.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)' }}>
-              Cargando catálogo...
-            </div>
-          ) : clientesFiltrados.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)', fontSize: '0.85rem' }}>
-              {clientes.length === 0 ? 'No hay clientes registrados en cuentas por cobrar.' : 'No se encontraron clientes para la búsqueda.'}
-            </div>
-          ) : (
-            clientesFiltrados.map((c) => {
-              const activo = clienteSeleccionado?.id === c.id;
-              const total = totalesCliente[c.id] || 0;
-              return (
-                <button
-                  key={c.id}
-                  class={`deudas-client-card ${activo ? 'activo' : ''}`}
-                  onClick={() => seleccionarCliente(c)}
-                >
-                  <div class="deudas-client-info-block">
-                    <div class="deudas-client-name">{c.nombre} {c.apellido}</div>
-                    {c.telefono && (
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text2)', marginTop: '0.1rem' }}>
-                        📞 {c.telefono}
-                      </div>
-                    )}
-                  </div>
-                  <div class="deudas-client-total">
-                    ${fmtBs(total)}
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-        <div style={{ padding: '1rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-surface)', marginTop: 'auto' }}>
-          <button
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--text-on-accent)', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
-            onClick={() => setCreandoCliente(true)}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-          >
-            ➕ Agregar Cliente
-          </button>
-          <button
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: '600', cursor: clienteSeleccionado ? 'pointer' : 'not-allowed', opacity: clienteSeleccionado ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
-            disabled={!clienteSeleccionado}
-            onClick={() => setEditandoCliente(true)}
-            onMouseEnter={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'var(--bg3)')}
-            onMouseLeave={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'transparent')}
-          >
-            ✏️ Editar Cliente
-          </button>
-          <button
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontWeight: '600', cursor: clienteSeleccionado ? 'pointer' : 'not-allowed', opacity: clienteSeleccionado ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
-            disabled={!clienteSeleccionado}
-            onClick={handleBorrarCliente}
-            onMouseEnter={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'var(--danger)', e.currentTarget.style.color = 'var(--bg-base)')}
-            onMouseLeave={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--danger)')}
-          >
-            🗑️ Borrar Cliente
-          </button>
-        </div>
+          </div>
+          <div class="deudas-search-container" style={{ padding: '0.7rem 0.40rem', borderBottom: '1px solid var(--border)' }}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o teléfono..."
+              value={busqueda}
+              onInput={(e) => setBusqueda((e.target as HTMLInputElement).value)}
+              style={{
+                width: '100%',
+                padding: '0.6rem 0.35rem',
+                borderRadius: '6px',
+                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg3)',
+                color: 'var(--text)',
+                fontSize: '0.85rem',
+                outline: 'none'
+              }}
+            />
+          </div>
+          <div class="deudas-client-list">
+            {cargandoLista && clientesFiltrados.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)' }}>
+                Cargando catálogo...
+              </div>
+            ) : clientesFiltrados.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)', fontSize: '0.85rem' }}>
+                {clientes.length === 0 ? 'No hay clientes registrados en cuentas por cobrar.' : 'No se encontraron clientes para la búsqueda.'}
+              </div>
+            ) : (
+              clientesFiltrados.map((c) => {
+                const activo = clienteSeleccionado?.id === c.id;
+                const total = totalesCliente[c.id] || 0;
+                return (
+                  <button
+                    key={c.id}
+                    class={`deudas-client-card ${activo ? 'activo' : ''}`}
+                    onClick={() => seleccionarCliente(c)}
+                  >
+                    <div class="deudas-client-info-block">
+                      <div class="deudas-client-name">{c.nombre} {c.apellido}</div>
+                      {c.telefono && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text2)', marginTop: '0.1rem' }}>
+                          📞 {c.telefono}
+                        </div>
+                      )}
+                    </div>
+                    <div class="deudas-client-total">
+                      ${fmtBs(total)}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div style={{ padding: '0.5rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.55rem', background: 'var(--bg-surface)', marginTop: 'auto' }}>
+            <button
+              style={{ width: '100%', padding: '0.25rem', borderRadius: '6px', border: 'none', background: 'var(--accent)', color: 'var(--text-on-accent)', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
+              onClick={() => setCreandoCliente(true)}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+            >
+              ➕ Agregar Cliente
+            </button>
+            <button
+              style={{ width: '100%', padding: '0.25rem', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: '600', cursor: clienteSeleccionado ? 'pointer' : 'not-allowed', opacity: clienteSeleccionado ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
+              disabled={!clienteSeleccionado}
+              onClick={() => setEditandoCliente(true)}
+              onMouseEnter={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'var(--bg3)')}
+              onMouseLeave={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'transparent')}
+            >
+              ✏️ Editar Cliente
+            </button>
+            <button
+              style={{ width: '100%', padding: '0.25rem', borderRadius: '6px', border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontWeight: '600', cursor: clienteSeleccionado ? 'pointer' : 'not-allowed', opacity: clienteSeleccionado ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
+              disabled={!clienteSeleccionado}
+              onClick={handleBorrarCliente}
+              onMouseEnter={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'var(--danger)', e.currentTarget.style.color = 'var(--bg-base)')}
+              onMouseLeave={(e) => !clienteSeleccionado ? null : (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--danger)')}
+            >
+              🗑️ Borrar Cliente
+            </button>
+          </div>
         </aside>
       </div>
 
@@ -732,20 +732,20 @@ function PanelDeudasContenido() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div class="deudas-total-acumulado" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                  <span style={{ fontSize: '0.8rem' }}>Deuda Total Pendiente</span>
+                  <span style={{ fontSize: '0.8rem' }}>Deuda Total</span>
                   <strong style={{ fontSize: '1.2rem' }}>${fmtBs(totalAcumulado)} USD</strong>
-                  <button
-                    onClick={generarMensajeWhatsApp}
-                    style={{ background: '#25D366', color: 'black', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer', marginTop: '0.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', fontWeight: 'bold' }}
-                  >
-                    💬 Resumen WhatsApp
-                  </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginRight: '1rem' }}>
                   <label style={{ fontSize: '0.85rem', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={mostrarPagados} onChange={e => setMostrarPagados((e.target as HTMLInputElement).checked)} />
                     Mostrar cobrados
                   </label>
+                  <button
+                    onClick={generarMensajeWhatsApp}
+                    style={{ background: '#25D366', color: 'black', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', fontWeight: 'bold' }}
+                  >
+                    💬 Resumen
+                  </button>
                 </div>
                 {deudas.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -947,7 +947,7 @@ function PanelDeudasContenido() {
             )}
 
             {/* Cuadro de Observaciones (Fijo al final) */}
-            <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid var(--border)' }}>
+            <div style={{ marginTop: 'auto', padding: '0.5rem 0.30rem', borderTop: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <div
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '0.2rem 0' }}
@@ -968,7 +968,7 @@ function PanelDeudasContenido() {
                     placeholder="Escribe notas, promesas de pago o detalles del cliente aquí... (Se guarda automáticamente al hacer clic fuera)"
                     style={{
                       width: '100%',
-                      minHeight: '80px',
+                      minHeight: '110px',
                       padding: '0.8rem',
                       borderRadius: '8px',
                       border: '1px solid var(--border)',
@@ -978,7 +978,7 @@ function PanelDeudasContenido() {
                       resize: 'vertical',
                       outline: 'none',
                       boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)',
-                      marginTop: '0.5rem'
+                      marginTop: '0rem'
                     }}
                   />
                 )}

@@ -924,7 +924,7 @@ body {
 .deudas-container {
   display: grid;
   grid-template-columns: 280px 1fr;
-  gap: 1.5rem;
+  gap: 0.75rem;
   height: 100vh;
   padding: 1rem;
   box-sizing: border-box;
@@ -940,25 +940,28 @@ body {
 }
 
 .deudas-sidebar-header {
-  padding: 1rem;
+  padding-bottom: 0.25rem;
+  padding-top: 0.25rem;
   border-bottom: 1px solid var(--border);
   font-weight: 700;
   font-size: 1rem;
   background: var(--bg3);
+  display: flex;
+  justify-content: center;
 }
 
 .deudas-client-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem;
+  padding: 0.25rem 0.3rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
 
 .deudas-client-card {
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
+  padding: 0.5rem;
+  border-radius: 12px;
   background: none;
   border: 1px solid transparent;
   color: var(--text);
@@ -981,7 +984,7 @@ body {
 
 .deudas-client-name {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
 }
 
 .deudas-client-total {
@@ -997,7 +1000,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 1.5rem;
+  padding: 0.5rem 0.5rem 0 0.5rem;
 }
 
 .deudas-main-empty {
@@ -1020,8 +1023,8 @@ body {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.60rem;
 }
 
 .deudas-main-header h2 {
@@ -1058,8 +1061,7 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding-right: 0.5rem;
+  gap: 0.75rem;
 }
 
 .deuda-session-card {
