@@ -1241,8 +1241,16 @@ body {
   box-shadow: 0 6px 20px rgba(108, 99, 255, 0.35);
 }
 
-.btn-confirmar-cobro-main:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  box-shadow: none;
+
+
+@keyframes jump-attention {
+  0%, 80%, 100% { transform: translateY(0); }
+  85% { transform: translateY(-4px); }
+  90% { transform: translateY(0); }
+  95% { transform: translateY(-2px); }
+}
+
+.anim-jump-attention {
+  animation: jump-attention 2.5s ease-in-out infinite;
+  transform-origin: bottom center;
 }

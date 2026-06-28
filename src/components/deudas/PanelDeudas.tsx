@@ -605,8 +605,11 @@ function PanelDeudasContenido() {
       mensaje += `Subtotal del día: $${fmtBs(data.subtotal)} ❗\n\n`;
     }
 
+    const totalBs = totalAcumulado * tasaNum;
+
     mensaje += `-----------------------------------\n`;
     mensaje += `Total Deuda Acumulada: $${fmtBs(totalAcumulado)} USD ❗❗\n`;
+    mensaje += `(Bs ${fmtBs(totalBs)})\n`;
 
     setTextoWA(mensaje);
     setModalWA(true);
@@ -953,8 +956,15 @@ function PanelDeudasContenido() {
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '0.2rem 0' }}
                   onClick={() => setMostrarObservaciones(!mostrarObservaciones)}
                 >
-                  <label style={{ fontSize: '0.85rem', color: 'var(--text2)', fontWeight: '600', cursor: 'pointer', margin: 0 }}>
+                  <label
+                    class={observacionesLocales.trim() && !mostrarObservaciones ? 'anim-jump-attention' : ''}
+                    style={{ fontSize: '0.85rem', color: observacionesLocales.trim() ? 'var(--text)' : 'var(--text2)', fontWeight: '600', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     📝 Observaciones del Cliente
+                    {observacionesLocales.trim() && !mostrarObservaciones && (
+                      <span style={{ fontSize: '0.7rem', fontWeight: '500', color: 'var(--accent2)', background: 'rgba(76, 175, 130, 0.1)', border: '1px solid rgba(76, 175, 130, 0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                        Contiene información
+                      </span>
+                    )}
                   </label>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text2)', userSelect: 'none' }}>
                     {mostrarObservaciones ? '▲ Ocultar' : '▼ Mostrar'}
@@ -1038,7 +1048,7 @@ function PanelDeudasContenido() {
                     navigator.clipboard.writeText(textoWA);
                     alert('¡Mensaje copiado al portapapeles!');
                   }}
-                  style={{ background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  style={{ background: '#25D366', color: 'black', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 >
                   📋 Copiar Mensaje
                 </button>
