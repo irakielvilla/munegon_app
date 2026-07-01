@@ -104,6 +104,32 @@ fn ejecutar_migraciones(conn: &mut Connection) -> rusqlite::Result<()> {
             [],
         );
 
+        // Migración 8: Tablas de Comandas (idempotente — CREATE TABLE IF NOT EXISTS)
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS Comanda (
+                 id TEXT PRIMARY KEY,
+                 nombre TEXT NOT NULL,
+                 estado TEXT NOT NULL DEFAULT 'abierta',
+                 subtotal TEXT NOT NULL DEFAULT '0.00',
+                 impuesto TEXT NOT NULL DEFAULT '0.00',
+                 total TEXT NOT NULL DEFAULT '0.00',
+                 ventaId TEXT,
+                 usuarioId TEXT NOT NULL,
+                 creadoEn TEXT NOT NULL DEFAULT (datetime('now')),
+                 cobradoEn TEXT
+             );
+             CREATE TABLE IF NOT EXISTS LineaComanda (
+                 id TEXT PRIMARY KEY,
+                 comandaId TEXT NOT NULL,
+                 productoId TEXT NOT NULL,
+                 cantidad INTEGER NOT NULL,
+                 precioUnit TEXT NOT NULL,
+                 subtotal TEXT NOT NULL,
+                 FOREIGN KEY(comandaId) REFERENCES Comanda(id) ON DELETE CASCADE,
+                 FOREIGN KEY(productoId) REFERENCES Producto(id)
+             );"
+        );
+
     Ok(())
 }
 
@@ -233,6 +259,30 @@ fn inicializar_tablas(conn: &Connection) -> rusqlite::Result<()> {
              anulada BOOLEAN NOT NULL DEFAULT 0,
              activo INTEGER NOT NULL DEFAULT 1,
              FOREIGN KEY(deudaId) REFERENCES Deuda(id) ON DELETE CASCADE,
+             FOREIGN KEY(productoId) REFERENCES Producto(id)
+         );
+
+         CREATE TABLE IF NOT EXISTS Comanda (
+             id TEXT PRIMARY KEY,
+             nombre TEXT NOT NULL,
+             estado TEXT NOT NULL DEFAULT 'abierta',
+             subtotal TEXT NOT NULL DEFAULT '0.00',
+             impuesto TEXT NOT NULL DEFAULT '0.00',
+             total TEXT NOT NULL DEFAULT '0.00',
+             ventaId TEXT,
+             usuarioId TEXT NOT NULL,
+             creadoEn TEXT NOT NULL DEFAULT (datetime('now')),
+             cobradoEn TEXT
+         );
+
+         CREATE TABLE IF NOT EXISTS LineaComanda (
+             id TEXT PRIMARY KEY,
+             comandaId TEXT NOT NULL,
+             productoId TEXT NOT NULL,
+             cantidad INTEGER NOT NULL,
+             precioUnit TEXT NOT NULL,
+             subtotal TEXT NOT NULL,
+             FOREIGN KEY(comandaId) REFERENCES Comanda(id) ON DELETE CASCADE,
              FOREIGN KEY(productoId) REFERENCES Producto(id)
          );"
     )?;

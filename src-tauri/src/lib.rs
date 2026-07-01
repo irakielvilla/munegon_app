@@ -112,6 +112,16 @@ pub fn run() {
             commands::ventas::actualizar_cantidad_linea_deuda,
             commands::ventas::obtener_clientes_pendientes,
             commands::ventas::obtener_deudas_pendientes,
+            // Comandas (Mesas / Turnos)
+            commands::comandas::crear_comanda,
+            commands::comandas::listar_comandas,
+            commands::comandas::editar_nombre_comanda,
+            commands::comandas::eliminar_comanda,
+            commands::comandas::agregar_producto_comanda,
+            commands::comandas::eliminar_linea_comanda,
+            commands::comandas::obtener_detalle_comanda,
+            commands::comandas::cobrar_comanda,
+            commands::comandas::listar_historial_comandas,
         ])
         .run(tauri::generate_context!())
         .expect("Error al iniciar Muñegon POS");

@@ -107,6 +107,36 @@ export interface DeudaInfo {
   lineas: LineaDeudaInfo[];
 }
 
+export interface ComandaInfo {
+  id: string;
+  nombre: string;
+  estado: 'abierta' | 'cobrada';
+  subtotal: string;
+  impuesto: string;
+  total: string;
+  ventaId: string | null;
+  usuarioId: string;
+  creadoEn: string;
+  cobradoEn: string | null;
+  numLineas: number;
+}
+
+export interface LineaComandaInfo {
+  id: string;
+  comandaId: string;
+  productoId: string;
+  productoNombre: string;
+  monedaBase: 'USD' | 'BS';
+  cantidad: number;
+  precioUnit: string;
+  subtotal: string;
+}
+
+export interface DetalleComanda {
+  comanda: ComandaInfo;
+  lineas: LineaComandaInfo[];
+}
+
 // ── Detección de entorno ──────────────────────────────────────
 // Nota: en Tauri v2 puede ser __TAURI__, __TAURI_INTERNALS__ o __TAURI_IPC__
 export const isTauri = () => typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window || '__TAURI_IPC__' in window);
@@ -217,7 +247,66 @@ export const api = {
     throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
   },
 
-  // ── SERVICIOS: Transacciones Independientes ──
+  // ── COMANDAS ──
+  crear_comanda: async (usuarioId: string, nombre: string): Promise<string> => {
+    if (isTauri()) return invokeTauri<string>('crear_comanda', { usuarioId, nombre });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  listar_comandas: async (): Promise<ComandaInfo[]> => {
+    if (isTauri()) return invokeTauri<ComandaInfo[]>('listar_comandas');
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  editar_nombre_comanda: async (id: string, nombre: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('editar_nombre_comanda', { id, nombre });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  eliminar_comanda: async (id: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('eliminar_comanda', { id });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  agregar_producto_comanda: async (
+    comandaId: string,
+    productoId: string,
+    cantidad: number,
+    precioUnit: string,
+    subtotal: string,
+  ): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('agregar_producto_comanda', { comandaId, productoId, cantidad, precioUnit, subtotal });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  eliminar_linea_comanda: async (comandaId: string, lineaId: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('eliminar_linea_comanda', { comandaId, lineaId });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  obtener_detalle_comanda: async (comandaId: string): Promise<DetalleComanda> => {
+    if (isTauri()) return invokeTauri<DetalleComanda>('obtener_detalle_comanda', { comandaId });
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  cobrar_comanda: async (payload: {
+    comandaId: string;
+    usuarioId: string;
+    formaPago: string;
+    moneda: string;
+    referenciaPago?: string;
+    tasaCambio?: string;
+  }): Promise<string> => {
+    if (isTauri()) return invokeTauri<string>('cobrar_comanda', payload);
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+  listar_historial_comandas: async (): Promise<ComandaInfo[]> => {
+    if (isTauri()) return invokeTauri<ComandaInfo[]>('listar_historial_comandas');
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
+  },
+
+
   procesar_avance_efectivo: async (usuarioId: string, montoEfectivo: number, metodoPago: string, porcentaje: number, tasaCambio: string): Promise<void> => {
     if (isTauri()) {
       return invokeTauri<void>('procesar_avance_efectivo', {
