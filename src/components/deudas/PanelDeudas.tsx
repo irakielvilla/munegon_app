@@ -912,21 +912,28 @@ function PanelDeudasContenido() {
                   <div class="deuda-cobro-main-footer">
                     <div class="deuda-cobro-main-totales">
                       <div class="deuda-cobro-main-totales-item">
-                        <span>Productos Marcados</span>
+                        <span>Productos</span><span>Marcados</span>
                         <strong>{Object.keys(lineasSeleccionadas).length}</strong>
                       </div>
                       <div class="deuda-cobro-main-totales-item">
                         <span>Subtotal</span>
-                        <strong>${fmtBs(selectedSubtotal)} USD</strong>
+                        <strong>${fmtBs(selectedSubtotal)}</strong>
                         <span class="total-bs">({fmtBs(selectedSubtotal * tasaNum)} Bs)</span>
                       </div>
                       <div class="deuda-cobro-main-totales-item">
-                        <span>Total (con IVA)</span>
-                        <strong style={{ color: 'var(--accent2)' }}>${fmtBs(selectedTotal)} USD</strong>
+                        <span>Total</span><span>(con IVA)</span>
+                        <strong style={{ color: 'var(--accent2)' }}>${fmtBs(selectedTotal)}</strong>
                         <span class="total-bs">({fmtBs(selectedTotal * tasaNum)} Bs)</span>
                       </div>
                     </div>
                     <div class="deuda-cobro-main-acciones">
+                      <button
+                        class="btn-confirmar-cobro-main"
+                        onClick={() => setModalPagoOpen(true)}
+                        disabled={selectedSubtotal <= 0 || procesando}
+                      >
+                        {procesando ? 'Procesando...' : '💵 Cobrar'}
+                      </button>
                       <button
                         class="btn-cancelar-cobro-main"
                         onClick={() => {
@@ -935,13 +942,6 @@ function PanelDeudasContenido() {
                         }}
                       >
                         Cancelar
-                      </button>
-                      <button
-                        class="btn-confirmar-cobro-main"
-                        onClick={() => setModalPagoOpen(true)}
-                        disabled={selectedSubtotal <= 0 || procesando}
-                      >
-                        {procesando ? 'Procesando...' : '💵 Cobrar Selección'}
                       </button>
                     </div>
                   </div>

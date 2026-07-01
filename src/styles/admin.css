@@ -32,6 +32,18 @@ body {
   min-height: 100vh;
 }
 
+/* ── Global Inputs ──────────────────────────────────────────── */
+/* Quitar flechas de los input number */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* ── Admin Container ────────────────────────────────────────── */
 .inv-container,
 .rep-container {
@@ -1049,6 +1061,7 @@ body {
   font-size: 0.72rem;
   color: var(--text2);
   text-transform: uppercase;
+  text-align: center;
 }
 
 .deudas-total-acumulado strong {
@@ -1157,14 +1170,14 @@ body {
 }
 
 .deuda-cobro-main-footer {
-  margin-top: auto;
   background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 0.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 1.5rem;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.22s ease;
@@ -1174,12 +1187,18 @@ body {
   display: flex;
   gap: 2rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .deuda-cobro-main-totales-item {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  align-items: center;
+  justify-content: center;
+  min-width: max-content;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .deuda-cobro-main-totales-item span {
@@ -1203,7 +1222,9 @@ body {
 
 .deuda-cobro-main-acciones {
   display: flex;
+  flex-direction: column;
   gap: 0.75rem;
+  min-width: 170px;
 }
 
 .btn-cancelar-cobro-main {
@@ -1244,10 +1265,24 @@ body {
 
 
 @keyframes jump-attention {
-  0%, 80%, 100% { transform: translateY(0); }
-  85% { transform: translateY(-4px); }
-  90% { transform: translateY(0); }
-  95% { transform: translateY(-2px); }
+
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+
+  85% {
+    transform: translateY(-4px);
+  }
+
+  90% {
+    transform: translateY(0);
+  }
+
+  95% {
+    transform: translateY(-2px);
+  }
 }
 
 .anim-jump-attention {

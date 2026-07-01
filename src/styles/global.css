@@ -85,6 +85,16 @@ body {
   /* POS app — sin scroll global */
 }
 
+/* ── Inputs Globales ────────────────────────────────────────────── */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* ── Scrollbar personalizada ──────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
