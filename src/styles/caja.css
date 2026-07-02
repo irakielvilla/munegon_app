@@ -54,10 +54,11 @@ body {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.65rem 1.25rem;
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
+  background: var(--accent);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
   flex-wrap: wrap;
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.2);
 }
 
 .caja-header-left {
@@ -70,19 +71,22 @@ body {
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.3px;
+  color: var(--bg);
 }
 
 .logo-pos {
-  color: var(--accent);
+  color: var(--bg);
+  opacity: 0.8;
 }
 
 .cajero-badge {
-  background: var(--bg3);
-  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 20px;
   padding: 0.2rem 0.8rem;
   font-size: 0.8rem;
-  color: var(--text2);
+  color: var(--bg);
+  font-weight: 600;
 }
 
 .caja-header-right {
@@ -91,18 +95,20 @@ body {
 }
 
 .btn-corte-x {
-  background: rgba(240, 165, 0, 0.15);
-  border: 1px solid var(--warn);
-  color: var(--warn);
+  background: var(--danger);
+  border: 1px solid var(--danger);
+  color: #fff;
   border-radius: 8px;
   padding: 0.4rem 0.9rem;
   font-size: 0.82rem;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.15s;
+  font-weight: 600;
 }
 
 .btn-corte-x:hover {
-  background: rgba(240, 165, 0, 0.28);
+  background: #c94b4b;
+  transform: translateY(-1px);
 }
 
 .btn-corte-x:disabled {
@@ -130,7 +136,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--bg3);
+  background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.3rem 0.75rem;
@@ -204,14 +210,14 @@ body {
 
 .reloj-fecha {
   font-size: 0.75rem;
-  color: var(--text2);
+  color: rgba(0, 0, 0, 0.55);
   text-transform: capitalize;
 }
 
 .reloj-hora {
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--text);
+  color: rgba(0, 0, 0, 0.75);
 }
 
 /* ── Flash ──────────────────────────────────────────────────── */
