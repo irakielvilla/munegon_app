@@ -218,7 +218,7 @@ pub fn agregar_producto_comanda(
     if existe {
         // Actualizar cantidad + subtotal de la línea existente
         conn.execute(
-            "UPDATE LineaComanda SET cantidad = cantidad + ?1, subtotal = ?2
+            "UPDATE LineaComanda SET cantidad = cantidad + ?1, subtotal = printf('%.2f', CAST(subtotal AS REAL) + CAST(?2 AS REAL))
              WHERE comandaId = ?3 AND productoId = ?4",
             params![cantidad, subtotal, comanda_id, producto_id],
         )

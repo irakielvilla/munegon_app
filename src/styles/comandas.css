@@ -537,58 +537,77 @@ body {
 .comanda-linea:hover { background: var(--bg4); }
 
 .linea-info {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
   min-width: 0;
 }
 
 .linea-nombre {
-  font-size: 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  white-space: normal;
+}
+
+.linea-precio {
+  font-size: 0.78rem;
+  color: var(--accent2);
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.linea-cant {
-  font-size: 0.58rem;
-  color: var(--text2);
-  flex-shrink: 0;
-}
-
-.linea-right {
+.linea-controls {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
+  gap: 0.35rem;
 }
 
-.linea-subtotal {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--gold);
-}
-
-.linea-btn-eliminar {
-  background: transparent;
-  border: 1px solid rgba(224,92,92,0.35);
-  color: var(--danger);
+.qty-btn {
+  width: 24px;
+  height: 24px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  width: 22px;
-  height: 22px;
-  font-size: 0.55rem;
+  color: var(--text);
   cursor: pointer;
+  font-size: 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 150ms ease;
-  flex-shrink: 0;
+  transition: border-color 0.15s;
 }
-.linea-btn-eliminar:hover {
-  background: rgba(224,92,92,0.15);
+
+.qty-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.qty-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.qty-num-box {
+  width: 32px;
+  background: var(--bg);
+  border: 1px solid var(--bg);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 0.2rem 0;
+}
+
+.btn-eliminar-item {
+  color: var(--danger);
+  border-color: transparent;
+  background: rgba(224, 92, 92, 0.08);
+}
+
+.btn-eliminar-item:hover {
+  background: rgba(224, 92, 92, 0.2);
   border-color: var(--danger);
+  color: var(--danger);
 }
 
 /* Totalizador detalle */
@@ -604,24 +623,24 @@ body {
 .total-row {
   display: flex;
   justify-content: space-between;
-  font-size: 0.65rem;
+  font-size: 0.82rem;
   color: var(--text2);
 }
 
 .total-final {
   font-size: 1.05rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text);
-  margin-top: 0.3rem;
-  padding-top: 0.5rem;
+  margin-top: 0.2rem;
+  padding-top: 0.4rem;
   border-top: 1px solid var(--border);
 }
 
 .total-bs-secundario {
-  font-size: 0.6rem;
+  font-size: 0.78rem;
   color: var(--text2);
   text-align: right;
-  margin-top: 0.1rem;
+  margin-top: -0.1rem;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -833,3 +852,28 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* ── Botón Cobrar (Similar a Caja) ───────────────────────────── */
+.btn-cobrar-comanda {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.85rem;
+  background: var(--gold);
+  border: none;
+  border-radius: var(--card-r);
+  color: var(--bg);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.btn-cobrar-comanda:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-cobrar-comanda:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

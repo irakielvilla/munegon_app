@@ -362,7 +362,7 @@ function PanelComandas({
 
 function DetalleComandaVista({
   comanda, lineas, productos, config, procesando, mensaje,
-  onVolver, onAgregarProducto, onEliminarLinea, onCobrar,
+  onVolver, onAgregarProducto, onRestarProducto, onEliminarLinea, onCobrar,
 }: {
   comanda: ComandaInfo;
   lineas: LineaComandaInfo[];
@@ -372,6 +372,7 @@ function DetalleComandaVista({
   mensaje: { tipo: 'ok' | 'error'; texto: string } | null;
   onVolver: () => void;
   onAgregarProducto: (p: Producto) => void;
+  onRestarProducto: (l: LineaComandaInfo, p: Producto) => void;
   onEliminarLinea: (lineaId: string) => void;
   onCobrar: () => void;
 }) {
@@ -400,14 +401,6 @@ function DetalleComandaVista({
           <span class="cmd-logo">🍽️ <strong>{comanda.nombre}</strong></span>
         </div>
         <div class="cmd-header-right">
-          <button
-            id="btn-cobrar-comanda"
-            class="cmd-btn cmd-btn-success"
-            disabled={lineas.length === 0 || procesando}
-            onClick={onCobrar}
-          >
-            {procesando ? '⏳ Procesando…' : `💰 Cobrar $${fmt2(totalUSD)}`}
-          </button>
         </div>
       </header>
 
@@ -480,18 +473,36 @@ function DetalleComandaVista({
               <div class="cmd-empty">Agrega productos del catálogo</div>
             ) : (
               lineas.map((l) => {
-                const subtotalNum = parseFloat(l.subtotal) || 0;
+                const precioUnitNum = parseFloat(l.precioUnit) || 0;
+                const lineaBs = precioUnitNum * l.cantidad * tasaNum;
+
                 return (
                   <div key={l.id} class="comanda-linea">
                     <div class="linea-info">
                       <span class="linea-nombre">{l.productoNombre}</span>
-                      <span class="linea-cant">×{l.cantidad}</span>
+                      <span class="linea-precio">Bs {fmtBs(lineaBs)}</span>
                     </div>
-                    <div class="linea-right">
-                      <span class="linea-subtotal">${fmt2(subtotalNum)}</span>
+                    <div class="linea-controls">
+                      <button 
+                        class="qty-btn" 
+                        onClick={() => {
+                          const p = productos.find(prod => prod.id === l.productoId);
+                          if (p) onRestarProducto(l, p);
+                        }}
+                        title="Quitar uno"
+                      >−</button>
+                      <div class="qty-num-box">{l.cantidad}</div>
+                      <button 
+                        class="qty-btn" 
+                        onClick={() => {
+                          const p = productos.find(prod => prod.id === l.productoId);
+                          if (p) onAgregarProducto(p);
+                        }}
+                        title="Agregar otro"
+                      >+</button>
                       <button
                         id={`eliminar-linea-${l.id}`}
-                        class="linea-btn-eliminar"
+                        class="qty-btn btn-eliminar-item"
                         onClick={() => onEliminarLinea(l.id)}
                         title="Eliminar del pedido"
                       >
@@ -508,17 +519,25 @@ function DetalleComandaVista({
           <div class="comanda-totalizador">
             <div class="total-row">
               <span>Subtotal</span>
-              <span>${fmt2(subtotalUSD)}</span>
+              <span>Bs {fmtBs(subtotalUSD * tasaNum)}</span>
             </div>
             <div class="total-row">
               <span>IVA ({config.iva_porcentaje}%)</span>
-              <span>${fmt2(impuestoUSD)}</span>
+              <span>Bs {fmtBs(impuestoUSD * tasaNum)}</span>
             </div>
             <div class="total-row total-final">
               <span>TOTAL</span>
-              <span>${fmt2(totalUSD)}</span>
+              <span>Bs {fmtBs(totalUSD * tasaNum)}</span>
             </div>
-            <div class="total-bs-secundario">Bs {fmtBs(totalUSD * tasaNum)}</div>
+            <div class="total-bs-secundario">$ {fmt2(totalUSD)} USD</div>
+            <button
+              id="btn-cobrar-comanda"
+              class="btn-cobrar-comanda"
+              disabled={lineas.length === 0 || procesando}
+              onClick={onCobrar}
+            >
+              {procesando ? '⏳ Procesando…' : `💳 Cobrar Bs ${fmtBs(totalUSD * tasaNum)}`}
+            </button>
           </div>
         </aside>
       </div>
@@ -709,6 +728,39 @@ export default function GestorComandas() {
     }
   };
 
+  const handleRestarProducto = async (l: LineaComandaInfo, p: Producto) => {
+    if (!comandaActual || !session) return;
+    
+    if (l.cantidad <= 1) {
+      return handleEliminarLinea(l.id);
+    }
+    
+    const tasaNum = parseFloat(config.tasa_cambio_bsd) || 1;
+    const precioUnit = getProductPriceUSD(p, tasaNum);
+    setProcesando(true);
+    try {
+      await api.agregar_producto_comanda(
+        comandaActual.id,
+        p.id,
+        -1,
+        precioUnit.toFixed(4),
+        fmt2(-precioUnit),
+      );
+      // Recargar detalle
+      const detalle = await api.obtener_detalle_comanda(comandaActual.id);
+      setComandaActual(detalle.comanda);
+      setLineasActuales(detalle.lineas);
+      // Actualizar stock local
+      setProductos((prev) =>
+        prev.map((prod) => prod.id === p.id ? { ...prod, stock: prod.stock + 1 } : prod),
+      );
+    } catch (e) {
+      flash('error', `❌ ${e}`);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
   const handleEliminarLinea = async (lineaId: string) => {
     if (!comandaActual) return;
     setProcesando(true);
@@ -775,6 +827,7 @@ export default function GestorComandas() {
             mensaje={mensaje}
             onVolver={volverPanel}
             onAgregarProducto={handleAgregarProducto}
+            onRestarProducto={handleRestarProducto}
             onEliminarLinea={handleEliminarLinea}
             onCobrar={() => setModal('pago')}
           />
