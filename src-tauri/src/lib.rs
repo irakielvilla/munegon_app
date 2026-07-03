@@ -121,6 +121,7 @@ pub fn run() {
             commands::comandas::eliminar_linea_comanda,
             commands::comandas::obtener_detalle_comanda,
             commands::comandas::cobrar_comanda,
+            commands::comandas::cobrar_comanda_credito,
             commands::comandas::listar_historial_comandas,
         ])
         .run(tauri::generate_context!())

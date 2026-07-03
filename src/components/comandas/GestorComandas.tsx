@@ -4,7 +4,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useCallback } from 'preact/hooks';
-import { api, type ComandaInfo, type LineaComandaInfo, type Producto, type ConfigApp } from '../../lib/api';
+import { api, type ComandaInfo, type LineaComandaInfo, type Producto, type ConfigApp, type ClienteInfo } from '../../lib/api';
 import { getSession } from '@lib/auth';
 import '../../styles/comandas.css';
 
@@ -142,19 +142,50 @@ const METODOS: { forma: FormaPago; label: string; icon: string; moneda: string }
   { forma: 'BS_EFECTIVO',  label: 'Efectivo Bs',  icon: '💴', moneda: 'BS' },
   { forma: 'BS_DEBITO',    label: 'Débito Bs',    icon: '💳', moneda: 'BS' },
   { forma: 'BS_PAGO_MOVIL',label: 'Pago Móvil',   icon: '📱', moneda: 'BS' },
+  { forma: 'CUENTA_COBRAR',label: 'A Crédito',    icon: '📒', moneda: 'USD' },
 ];
 
 function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: {
   totalUSD: number;
   tasa: string;
-  onConfirmar: (forma: FormaPago, referencia?: string) => void;
+  onConfirmar: (forma: FormaPago, referencia?: string, clienteId?: string) => void;
   onCerrar: () => void;
 }) {
   const [forma, setForma] = useState<FormaPago | null>(null);
   const [ref, setRef] = useState('');
+  
+  // Client selection state
+  const [clientes, setClientes] = useState<ClienteInfo[]>([]);
+  const [clienteId, setClienteId] = useState<string>('');
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [cargandoClientes, setCargandoClientes] = useState(false);
+  
   const tasaNum = parseFloat(tasa) || 1;
   const totalBs = totalUSD * tasaNum;
   const needsRef = forma === 'BS_DEBITO' || forma === 'BS_PAGO_MOVIL';
+
+  useEffect(() => {
+    if (forma === 'CUENTA_COBRAR') {
+      cargarClientes();
+    }
+  }, [forma]);
+
+  const cargarClientes = async () => {
+    setCargandoClientes(true);
+    try {
+      const lista = await api.listar_clientes();
+      setClientes(lista);
+      if (lista.length > 0) setClienteId(lista[0].id);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCargandoClientes(false);
+    }
+  };
+
+  const clientesFiltrados = clientes.filter(c => 
+    `${c.nombre} ${c.apellido}`.toLowerCase().includes(busquedaCliente.toLowerCase())
+  );
 
   return (
     <div class="cmd-overlay" onClick={onCerrar}>
@@ -192,14 +223,46 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: {
           </div>
         )}
 
+        {forma === 'CUENTA_COBRAR' && (
+          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label class="cmd-label">Seleccionar Cliente</label>
+            <input
+              type="text"
+              placeholder="🔍 Buscar cliente..."
+              value={busquedaCliente}
+              onInput={(e) => setBusquedaCliente((e.target as HTMLInputElement).value)}
+              class="cmd-input"
+            />
+            {cargandoClientes ? (
+              <span style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Cargando clientes...</span>
+            ) : (
+              <select
+                value={clienteId}
+                onChange={(e) => setClienteId((e.target as HTMLSelectElement).value)}
+                class="cmd-input"
+                style={{ padding: '0.6rem' }}
+              >
+                {clientesFiltrados.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre} {c.apellido} - {c.cedula}
+                  </option>
+                ))}
+              </select>
+            )}
+            <span style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>
+              Nota: Debes crear al cliente desde el módulo de Caja si no existe.
+            </span>
+          </div>
+        )}
+
         <div class="cmd-modal-actions">
           <button class="cmd-btn cmd-btn-ghost" onClick={onCerrar}>Cancelar</button>
           <button
             class="cmd-btn cmd-btn-success"
-            disabled={!forma}
-            onClick={() => forma && onConfirmar(forma, ref || undefined)}
+            disabled={!forma || (forma === 'CUENTA_COBRAR' && !clienteId)}
+            onClick={() => forma && onConfirmar(forma, ref || undefined, forma === 'CUENTA_COBRAR' ? clienteId : undefined)}
           >
-            Confirmar cobro
+            {forma === 'CUENTA_COBRAR' ? 'Guardar Deuda' : 'Confirmar cobro'}
           </button>
         </div>
       </div>
@@ -339,6 +402,13 @@ function PanelComandas({
                   <div class="card-productos">
                     {c.numLineas} producto{c.numLineas !== 1 ? 's' : ''}
                   </div>
+                  {c.ultimosProductos && (
+                    <div class="card-resumen-productos">
+                      {c.ultimosProductos.split('||').map((prodNombre, i) => (
+                        <span key={i} class="resumen-pill">{prodNombre}</span>
+                      ))}
+                    </div>
+                  )}
                   <button
                     class="card-btn-abrir"
                     onClick={(e) => { e.stopPropagation(); onVerDetalle(c); }}
@@ -777,19 +847,28 @@ export default function GestorComandas() {
     }
   };
 
-  const handleCobrar = async (forma: FormaPago, referencia?: string) => {
+  const handleCobrar = async (forma: FormaPago, referencia?: string, clienteId?: string) => {
     if (!comandaActual || !session) return;
     setModal(null);
     setProcesando(true);
     try {
-      await api.cobrar_comanda({
-        comandaId: comandaActual.id,
-        usuarioId: session.usuarioId,
-        formaPago: forma,
-        moneda: forma.startsWith('USD') ? 'USD' : 'BS',
-        referenciaPago: referencia,
-        tasaCambio: config.tasa_cambio_bsd,
-      });
+      if (forma === 'CUENTA_COBRAR') {
+        if (!clienteId) throw new Error('Cliente no seleccionado para venta a crédito');
+        await api.cobrar_comanda_credito({
+          comandaId: comandaActual.id,
+          clienteId,
+          usuarioId: session.usuarioId,
+        });
+      } else {
+        await api.cobrar_comanda({
+          comandaId: comandaActual.id,
+          usuarioId: session.usuarioId,
+          formaPago: forma,
+          moneda: forma.startsWith('USD') ? 'USD' : 'BS',
+          referenciaPago: referencia,
+          tasaCambio: config.tasa_cambio_bsd,
+        });
+      }
       flash('ok', '✅ Comanda cobrada exitosamente');
       setTimeout(() => volverPanel(), 1500);
     } catch (e) {

@@ -1,13 +1,13 @@
-// ══════════════════════════════════════════════════════════════
-// MUÑEGON POS — Comandos Tauri: Comandas (Mesas / Turnos)
-// ══════════════════════════════════════════════════════════════
+﻿// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// MUÃ‘EGON POS â€” Comandos Tauri: Comandas (Mesas / Turnos)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::db::open_db;
 
-// ── DTOs ──────────────────────────────────────────────────────
+// â”€â”€ DTOs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,6 +23,7 @@ pub struct ComandaInfo {
     pub creado_en: String,
     pub cobrado_en: Option<String>,
     pub num_lineas: i64,
+    pub ultimos_productos: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -46,7 +47,7 @@ pub struct DetalleComanda {
 }
 
 
-// ── Helper: recalcular totales de la comanda ──────────────────
+// â”€â”€ Helper: recalcular totales de la comanda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn recalcular_totales(conn: &rusqlite::Connection, comanda_id: &str, iva_porc: f64) -> rusqlite::Result<()> {
     let subtotal: f64 = conn.query_row(
@@ -80,7 +81,7 @@ fn obtener_iva(conn: &rusqlite::Connection) -> f64 {
         / 100.0
 }
 
-// ── Command: Crear Comanda ────────────────────────────────────
+// â”€â”€ Command: Crear Comanda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tauri::command]
 pub fn crear_comanda(usuario_id: String, nombre: String) -> Result<String, String> {
@@ -95,7 +96,7 @@ pub fn crear_comanda(usuario_id: String, nombre: String) -> Result<String, Strin
     Ok(id)
 }
 
-// ── Command: Listar Comandas Abiertas ─────────────────────────
+// â”€â”€ Command: Listar Comandas Abiertas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tauri::command]
 pub fn listar_comandas() -> Result<Vec<ComandaInfo>, String> {
@@ -104,7 +105,8 @@ pub fn listar_comandas() -> Result<Vec<ComandaInfo>, String> {
         .prepare(
             "SELECT c.id, c.nombre, c.estado, c.subtotal, c.impuesto, c.total,
                     c.ventaId, c.usuarioId, c.creadoEn, c.cobradoEn,
-                    (SELECT COUNT(*) FROM LineaComanda lc WHERE lc.comandaId = c.id) as num_lineas
+                    (SELECT COUNT(*) FROM LineaComanda lc WHERE lc.comandaId = c.id) as num_lineas,
+                    (SELECT GROUP_CONCAT(nombre, '||') FROM (SELECT p.nombre FROM LineaComanda lc JOIN Producto p ON p.id = lc.productoId WHERE lc.comandaId = c.id ORDER BY lc.rowid DESC LIMIT 5)) as ultimos_productos
              FROM Comanda c
              WHERE c.estado = 'abierta'
              ORDER BY c.creadoEn ASC",
@@ -125,6 +127,7 @@ pub fn listar_comandas() -> Result<Vec<ComandaInfo>, String> {
                 creado_en: row.get(8)?,
                 cobrado_en: row.get(9)?,
                 num_lineas: row.get(10)?,
+                ultimos_productos: row.get(11)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -132,7 +135,7 @@ pub fn listar_comandas() -> Result<Vec<ComandaInfo>, String> {
     rows.map(|r| r.map_err(|e| e.to_string())).collect()
 }
 
-// ── Command: Editar Nombre de Comanda ─────────────────────────
+// â”€â”€ Command: Editar Nombre de Comanda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tauri::command]
 pub fn editar_nombre_comanda(id: String, nombre: String) -> Result<(), String> {
@@ -145,13 +148,13 @@ pub fn editar_nombre_comanda(id: String, nombre: String) -> Result<(), String> {
     Ok(())
 }
 
-// ── Command: Eliminar Comanda (devuelve stock) ────────────────
+// â”€â”€ Command: Eliminar Comanda (devuelve stock) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tauri::command]
 pub fn eliminar_comanda(id: String) -> Result<(), String> {
     let conn = open_db().map_err(|e| e.to_string())?;
 
-    // Devolver stock de cada línea al inventario
+    // Devolver stock de cada lÃ­nea al inventario
     let mut stmt = conn
         .prepare("SELECT productoId, cantidad FROM LineaComanda WHERE comandaId = ?1")
         .map_err(|e| e.to_string())?;
@@ -170,14 +173,14 @@ pub fn eliminar_comanda(id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     }
 
-    // DELETE comanda (CASCADE elimina LineaComanda automáticamente)
+    // DELETE comanda (CASCADE elimina LineaComanda automÃ¡ticamente)
     conn.execute("DELETE FROM Comanda WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
-// ── Command: Agregar Producto a Comanda ───────────────────────
+// â”€â”€ Command: Agregar Producto a Comanda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tauri::command]
 pub fn agregar_producto_comanda(
@@ -205,7 +208,7 @@ pub fn agregar_producto_comanda(
         ));
     }
 
-    // Verificar si ya existe esa línea en la comanda (mismo producto)
+    // Verificar si ya existe esa lÃ­nea en la comanda (mismo producto)
     let existe: bool = conn
         .query_row(
             "SELECT COUNT(*) FROM LineaComanda WHERE comandaId = ?1 AND productoId = ?2",
@@ -216,7 +219,7 @@ pub fn agregar_producto_comanda(
         > 0;
 
     if existe {
-        // Actualizar cantidad + subtotal de la línea existente
+        // Actualizar cantidad + subtotal de la lÃ­nea existente
         conn.execute(
             "UPDATE LineaComanda SET cantidad = cantidad + ?1, subtotal = printf('%.2f', CAST(subtotal AS REAL) + CAST(?2 AS REAL))
              WHERE comandaId = ?3 AND productoId = ?4",
@@ -247,20 +250,20 @@ pub fn agregar_producto_comanda(
     Ok(())
 }
 
-// ── Command: Eliminar Línea de Comanda (devuelve stock) ───────
+// â”€â”€ Command: Eliminar LÃ­nea de Comanda (devuelve stock) â”€â”€â”€â”€â”€â”€â”€
 
 #[tauri::command]
 pub fn eliminar_linea_comanda(comanda_id: String, linea_id: String) -> Result<(), String> {
     let conn = open_db().map_err(|e| e.to_string())?;
 
-    // Obtener cantidad y producto de la línea para devolver stock
+    // Obtener cantidad y producto de la lÃ­nea para devolver stock
     let (producto_id, cantidad): (String, i64) = conn
         .query_row(
             "SELECT productoId, cantidad FROM LineaComanda WHERE id = ?1 AND comandaId = ?2",
             params![linea_id, comanda_id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .map_err(|e| format!("Línea no encontrada: {}", e))?;
+        .map_err(|e| format!("LÃ­nea no encontrada: {}", e))?;
 
     // Devolver stock
     conn.execute(
@@ -269,7 +272,7 @@ pub fn eliminar_linea_comanda(comanda_id: String, linea_id: String) -> Result<()
     )
     .map_err(|e| e.to_string())?;
 
-    // Eliminar la línea
+    // Eliminar la lÃ­nea
     conn.execute(
         "DELETE FROM LineaComanda WHERE id = ?1 AND comandaId = ?2",
         params![linea_id, comanda_id],
@@ -283,7 +286,7 @@ pub fn eliminar_linea_comanda(comanda_id: String, linea_id: String) -> Result<()
     Ok(())
 }
 
-// ── Command: Obtener Detalle de Comanda ───────────────────────
+// â”€â”€ Command: Obtener Detalle de Comanda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tauri::command]
 pub fn obtener_detalle_comanda(comanda_id: String) -> Result<DetalleComanda, String> {
@@ -294,7 +297,8 @@ pub fn obtener_detalle_comanda(comanda_id: String) -> Result<DetalleComanda, Str
         .query_row(
             "SELECT c.id, c.nombre, c.estado, c.subtotal, c.impuesto, c.total,
                     c.ventaId, c.usuarioId, c.creadoEn, c.cobradoEn,
-                    (SELECT COUNT(*) FROM LineaComanda lc WHERE lc.comandaId = c.id) as num_lineas
+                    (SELECT COUNT(*) FROM LineaComanda lc WHERE lc.comandaId = c.id) as num_lineas,
+                    (SELECT GROUP_CONCAT(nombre, '||') FROM (SELECT p.nombre FROM LineaComanda lc JOIN Producto p ON p.id = lc.productoId WHERE lc.comandaId = c.id ORDER BY lc.rowid DESC LIMIT 5)) as ultimos_productos
              FROM Comanda c WHERE c.id = ?1",
             params![comanda_id],
             |row| {
@@ -310,12 +314,13 @@ pub fn obtener_detalle_comanda(comanda_id: String) -> Result<DetalleComanda, Str
                     creado_en: row.get(8)?,
                     cobrado_en: row.get(9)?,
                     num_lineas: row.get(10)?,
+                    ultimos_productos: row.get(11)?,
                 })
             },
         )
         .map_err(|e| format!("Comanda no encontrada: {}", e))?;
 
-    // Líneas con nombre de producto y monedaBase
+    // LÃ­neas con nombre de producto y monedaBase
     let mut stmt = conn
         .prepare(
             "SELECT lc.id, lc.comandaId, lc.productoId, p.nombre, p.monedaBase,
@@ -347,8 +352,8 @@ pub fn obtener_detalle_comanda(comanda_id: String) -> Result<DetalleComanda, Str
     Ok(DetalleComanda { comanda, lineas })
 }
 
-// ── Command: Cobrar Comanda ───────────────────────────────────
-// Crea una Venta (SIN descontar stock — ya fue descontado al agregar)
+// â”€â”€ Command: Cobrar Comanda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Crea una Venta (SIN descontar stock â€” ya fue descontado al agregar)
 // y marca la comanda como 'cobrada'.
 
 #[tauri::command]
@@ -371,7 +376,7 @@ pub fn cobrar_comanda(
         )
         .map_err(|e| format!("Comanda no encontrada o ya cobrada: {}", e))?;
 
-    // Obtener líneas para LineaVenta
+    // Obtener lÃ­neas para LineaVenta
     let lineas: Vec<(String, i64, String, String)> = {
         let mut stmt = conn
             .prepare(
@@ -403,7 +408,7 @@ pub fn cobrar_comanda(
     )
     .map_err(|e| e.to_string())?;
 
-    // Crear LineaVenta por cada línea de comanda
+    // Crear LineaVenta por cada lÃ­nea de comanda
     for (producto_id, cantidad, precio_unit, linea_subtotal) in &lineas {
         let linea_id = Uuid::new_v4().to_string();
         tx.execute(
@@ -426,7 +431,7 @@ pub fn cobrar_comanda(
     Ok(venta_id)
 }
 
-// ── Command: Historial de Comandas Cobradas ───────────────────
+// â”€â”€ Command: Historial de Comandas Cobradas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tauri::command]
 pub fn listar_historial_comandas() -> Result<Vec<ComandaInfo>, String> {
@@ -435,7 +440,8 @@ pub fn listar_historial_comandas() -> Result<Vec<ComandaInfo>, String> {
         .prepare(
             "SELECT c.id, c.nombre, c.estado, c.subtotal, c.impuesto, c.total,
                     c.ventaId, c.usuarioId, c.creadoEn, c.cobradoEn,
-                    (SELECT COUNT(*) FROM LineaComanda lc WHERE lc.comandaId = c.id) as num_lineas
+                    (SELECT COUNT(*) FROM LineaComanda lc WHERE lc.comandaId = c.id) as num_lineas,
+                    (SELECT GROUP_CONCAT(nombre, '||') FROM (SELECT p.nombre FROM LineaComanda lc JOIN Producto p ON p.id = lc.productoId WHERE lc.comandaId = c.id ORDER BY lc.rowid DESC LIMIT 5)) as ultimos_productos
              FROM Comanda c
              WHERE c.estado = 'cobrada'
              ORDER BY c.cobradoEn DESC
@@ -457,9 +463,78 @@ pub fn listar_historial_comandas() -> Result<Vec<ComandaInfo>, String> {
                 creado_en: row.get(8)?,
                 cobrado_en: row.get(9)?,
                 num_lineas: row.get(10)?,
+                ultimos_productos: row.get(11)?,
             })
         })
         .map_err(|e| e.to_string())?;
 
     rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
+pub fn cobrar_comanda_credito(
+    comanda_id: String,
+    cliente_id: String,
+    usuario_id: String,
+) -> Result<String, String> {
+    let mut conn = open_db().map_err(|e| e.to_string())?;
+
+    // Obtener datos de la comanda
+    let (subtotal, impuesto, total): (String, String, String) = conn
+        .query_row(
+            "SELECT subtotal, impuesto, total FROM Comanda WHERE id = ?1 AND estado = 'abierta'",
+            params![comanda_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|e| format!("Comanda no encontrada o ya cobrada: {}", e))?;
+
+    // Obtener líneas para LineaDeuda
+    let lineas: Vec<(String, i64, String, String)> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT productoId, cantidad, precioUnit, subtotal
+                 FROM LineaComanda WHERE comandaId = ?1",
+            )
+            .map_err(|e| e.to_string())?;
+        let resultado: Vec<(String, i64, String, String)> = stmt.query_map(params![comanda_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+        resultado
+    };
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    // Crear Deuda
+    let deuda_id = Uuid::new_v4().to_string();
+    tx.execute(
+        "INSERT INTO Deuda (id, clienteId, usuarioId, subtotal, impuesto, total, creadoEn, isSynced)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'), 0)",
+        params![deuda_id, cliente_id, usuario_id, subtotal, impuesto, total],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Crear LineaDeuda
+    for (producto_id, cantidad, precio_unit, linea_subtotal) in &lineas {
+        let linea_id = Uuid::new_v4().to_string();
+        tx.execute(
+            "INSERT INTO LineaDeuda (id, deudaId, productoId, cantidad, precioUnit, subtotal)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![linea_id, deuda_id, producto_id, cantidad, precio_unit, linea_subtotal],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    // Marcar comanda como cobrada
+    tx.execute(
+        "UPDATE Comanda SET estado = 'cobrada', cobradoEn = datetime('now') WHERE id = ?1",
+        params![comanda_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(deuda_id)
 }

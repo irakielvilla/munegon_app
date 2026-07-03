@@ -694,5 +694,14 @@ export const api = {
 
     // Generar y descargar el PDF en el cliente
     return await api.generar_pdf_corte({ corteId });
+  },
+
+  cobrar_comanda_credito: async (payload: {
+    comandaId: string;
+    clienteId: string;
+    usuarioId: string;
+  }): Promise<string> => {
+    if (isTauri()) return invokeTauri<string>('cobrar_comanda_credito', payload);
+    throw new Error('Solo disponible en versión de escritorio (Tauri) por ahora');
   }
 };
