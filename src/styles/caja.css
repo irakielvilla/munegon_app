@@ -424,8 +424,6 @@ body {
   font-weight: bold;
   background: rgba(255, 71, 87, 0.1);
 }
-  color: var(--text2);
-}
 
 .prod-stock.stock-bajo {
   color: var(--warn);
