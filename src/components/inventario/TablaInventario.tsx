@@ -474,7 +474,9 @@ export default function TablaInventario() {
                 <input id="f-nombre" type="text" style={{ textTransform: 'uppercase' }} value={form.nombre} onInput={handleNombreInput} placeholder="Nombre del producto" />
               </div>
               <div class="form-group">
-                <label for="f-desc">Descripción</label>
+                <label for="f-desc" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  Descripción <span style={{ fontSize: '1rem', lineHeight: 1 }}>ℹ️</span>
+                </label>
                 <input id="f-desc" type="text" style={{ textTransform: 'uppercase' }} value={form.descripcion ?? ''} onInput={(e) => setField('descripcion', (e.target as HTMLInputElement).value.toUpperCase())} placeholder="Opcional" />
               </div>
               <div class="form-row">

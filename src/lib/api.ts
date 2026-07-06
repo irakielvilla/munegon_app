@@ -119,6 +119,7 @@ export interface ComandaInfo {
   creadoEn: string;
   cobradoEn: string | null;
   numLineas: number;
+  ultimosProductos?: string;
 }
 
 export interface LineaComandaInfo {

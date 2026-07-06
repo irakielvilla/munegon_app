@@ -998,6 +998,12 @@ export default function TerminalCaja() {
                     onClick={() => agregarAlCarrito(p)}
                     disabled={agotado}
                   >
+                    {p.descripcion && (
+                      <div class="prod-desc-indicador">
+                        ℹ️
+                        <div class="prod-desc-tooltip">{p.descripcion}</div>
+                      </div>
+                    )}
                     <span class="prod-nombre">{p.nombre}</span>
                     <span class="prod-sku">{p.sku}</span>
                     <span class={`prod-stock ${agotado ? 'stock-agotado' : p.stock <= 5 ? 'stock-bajo' : ''}`}>

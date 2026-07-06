@@ -282,7 +282,7 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: {
                     ) : (
                       clientesFiltrados.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.nombre} {c.apellido} - {c.cedula}
+                          {c.nombre} {c.apellido}
                         </option>
                       ))
                     )}
@@ -434,7 +434,7 @@ function PanelComandas({
                   </div>
                   {c.ultimosProductos && (
                     <div class="card-resumen-productos">
-                      {c.ultimosProductos.split('||').map((prodNombre, i) => (
+                      {c.ultimosProductos.split('||').map((prodNombre: string, i: number) => (
                         <span key={i} class="resumen-pill">{prodNombre}</span>
                       ))}
                     </div>

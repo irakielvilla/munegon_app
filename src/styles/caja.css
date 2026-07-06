@@ -1327,3 +1327,68 @@ body {
 #forma-cuenta_cobrar {
   grid-column: 2;
 }
+
+@keyframes icon-pulse-green {
+  0% { text-shadow: 0 0 2px rgba(16, 185, 129, 0.2); }
+  50% { text-shadow: 0 0 10px rgba(16, 185, 129, 0.9); }
+  100% { text-shadow: 0 0 2px rgba(16, 185, 129, 0.2); }
+}
+
+/* Tooltip de Descripción de Producto */
+.prod-desc-indicador {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  font-size: 1.15rem;
+  cursor: help;
+  z-index: 10;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+  animation: icon-pulse-green 2.5s infinite ease-in-out;
+}
+
+.prod-desc-indicador:hover {
+  opacity: 1;
+}
+
+.prod-desc-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  top: 140%; /* Mostrar abajo del icono */
+  right: -0.4rem; /* Alineado a la derecha */
+  width: max-content;
+  max-width: 280px;
+  background: var(--bg3);
+  color: var(--text);
+  text-align: left;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  z-index: 100;
+  transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+  transform: translateY(5px);
+  pointer-events: none;
+}
+
+/* Triángulo del tooltip */
+.prod-desc-tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  right: 10px;
+  margin-left: -5px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: transparent transparent var(--border) transparent;
+}
+
+.prod-desc-indicador:hover .prod-desc-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
