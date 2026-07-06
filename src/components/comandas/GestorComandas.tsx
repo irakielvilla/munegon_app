@@ -6,7 +6,9 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { api, type ComandaInfo, type LineaComandaInfo, type Producto, type ConfigApp, type ClienteInfo } from '../../lib/api';
 import { getSession } from '@lib/auth';
+import ModalOverlay from '../ui/ModalOverlay';
 import '../../styles/comandas.css';
+import '../../styles/caja.css';
 
 // ── Tipos locales ─────────────────────────────────────────────
 
@@ -162,7 +164,6 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: {
   
   const tasaNum = parseFloat(tasa) || 1;
   const totalBs = totalUSD * tasaNum;
-  const needsRef = forma === 'BS_DEBITO' || forma === 'BS_PAGO_MOVIL';
 
   useEffect(() => {
     if (forma === 'CUENTA_COBRAR') {
@@ -188,85 +189,114 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: {
   );
 
   return (
-    <div class="cmd-overlay" onClick={onCerrar}>
-      <div class="cmd-modal cmd-modal-pago" onClick={(e) => e.stopPropagation()}>
-        <h2 class="cmd-modal-title">💰 Cobrar Comanda</h2>
-
-        <div class="pago-totales">
-          <div class="pago-total-usd">${fmt2(totalUSD)} USD</div>
-          <div class="pago-total-bs">Bs {fmtBs(totalBs)}</div>
-          <div class="pago-tasa">Tasa: {tasa} Bs/$</div>
-        </div>
-
-        <div class="pago-metodos">
-          {METODOS.map((m) => (
-            <button
-              key={m.forma}
-              class={`pago-metodo-btn ${forma === m.forma ? 'selected' : ''}`}
-              onClick={() => setForma(m.forma)}
-            >
-              <span class="pago-icon">{m.icon}</span>
-              <span>{m.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {needsRef && (
-          <div>
-            <label class="cmd-label">Referencia (opcional)</label>
-            <input
-              class="cmd-input"
-              placeholder="Nro de referencia..."
-              value={ref}
-              onInput={(e) => setRef((e.target as HTMLInputElement).value)}
-            />
+    <ModalOverlay>
+      <div class="modal-flex-layout">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h2>💳 Procesar Pago</h2>
+            <button class="modal-close" onClick={onCerrar}>✕</button>
           </div>
-        )}
+
+          <div class="modal-totales">
+            <div class="monto-bs">
+              <span>Total</span>
+              <strong>Bs {fmtBs(totalBs)}</strong>
+            </div>
+            <div class="monto-usd">
+              <span>Equivalente</span>
+              <strong>${fmt2(totalUSD)} USD</strong>
+            </div>
+          </div>
+
+          <p class="modal-section-label">Forma de pago</p>
+          <div class="forma-pago-grid">
+            {METODOS.map((m) => (
+              <button
+                key={m.forma}
+                id={`forma-${m.forma.toLowerCase()}`}
+                class={`forma-btn ${forma === m.forma ? 'activa' : ''}`}
+                onClick={() => setForma(m.forma)}
+              >
+                <span class="forma-icon">{m.icon}</span>
+                <span class="forma-label">{m.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {(forma === 'BS_PAGO_MOVIL' || forma === 'BS_DEBITO') && (
+            <div class="referencia-group">
+              <label for="referencia-input">Nº de referencia *</label>
+              <input
+                id="referencia-input"
+                type="text"
+                placeholder="Últimos 4 dígitos"
+                value={ref}
+                onInput={(e) => {
+                  const rawVal = (e.target as HTMLInputElement).value;
+                  const numericVal = rawVal.replace(/\D/g, '').slice(0, 4);
+                  setRef(numericVal);
+                }}
+                maxLength={4}
+              />
+            </div>
+          )}
+
+          <div class="modal-actions">
+            <button class="btn-cancelar" onClick={onCerrar}>Cancelar</button>
+            <button
+              id="confirmar-pago"
+              class={`btn-confirmar ${forma === 'CUENTA_COBRAR' ? 'btn-confirmar--credito' : ''}`}
+              disabled={!forma || (forma === 'CUENTA_COBRAR' && !clienteId)}
+              onClick={() => forma && onConfirmar(forma, ref || undefined, forma === 'CUENTA_COBRAR' ? clienteId : undefined)}
+            >
+              {forma === 'CUENTA_COBRAR' ? '💾 Guardar Deuda' : '✅ Confirmar Pago'}
+            </button>
+          </div>
+        </div>
 
         {forma === 'CUENTA_COBRAR' && (
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label class="cmd-label">Seleccionar Cliente</label>
-            <input
-              type="text"
-              placeholder="🔍 Buscar cliente..."
-              value={busquedaCliente}
-              onInput={(e) => setBusquedaCliente((e.target as HTMLInputElement).value)}
-              class="cmd-input"
-            />
-            {cargandoClientes ? (
-              <span style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Cargando clientes...</span>
-            ) : (
-              <select
-                value={clienteId}
-                onChange={(e) => setClienteId((e.target as HTMLSelectElement).value)}
-                class="cmd-input"
-                style={{ padding: '0.6rem' }}
-              >
-                {clientesFiltrados.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre} {c.apellido} - {c.cedula}
-                  </option>
-                ))}
-              </select>
-            )}
-            <span style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>
-              Nota: Debes crear al cliente desde el módulo de Caja si no existe.
-            </span>
+          <div class="cliente-cobrar-lateral">
+            <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label for="cliente-select" style={{ fontSize: '0.78rem', color: 'var(--text2)' }}>Seleccionar Cliente *</label>
+              <input
+                type="text"
+                placeholder="🔍 Buscar cliente deudor..."
+                value={busquedaCliente}
+                onInput={(e) => setBusquedaCliente((e.target as HTMLInputElement).value)}
+                style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+              />
+              <div class="cliente-select-row" style={{ flexDirection: 'column', width: '100%' }}>
+                {cargandoClientes ? (
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Cargando clientes...</span>
+                ) : (
+                  <select
+                    id="cliente-select"
+                    value={clienteId}
+                    onChange={(e) => setClienteId((e.target as HTMLSelectElement).value)}
+                    class="cliente-select"
+                    style={{ width: '100%' }}
+                    size={5}
+                  >
+                    {clientesFiltrados.length === 0 ? (
+                      <option value="">No se encontraron clientes</option>
+                    ) : (
+                      clientesFiltrados.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre} {c.apellido} - {c.cedula}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                )}
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text2)', marginTop: '0.5rem' }}>
+                Nota: Debes crear al cliente desde el módulo de Caja si no existe.
+              </span>
+            </div>
           </div>
         )}
-
-        <div class="cmd-modal-actions">
-          <button class="cmd-btn cmd-btn-ghost" onClick={onCerrar}>Cancelar</button>
-          <button
-            class="cmd-btn cmd-btn-success"
-            disabled={!forma || (forma === 'CUENTA_COBRAR' && !clienteId)}
-            onClick={() => forma && onConfirmar(forma, ref || undefined, forma === 'CUENTA_COBRAR' ? clienteId : undefined)}
-          >
-            {forma === 'CUENTA_COBRAR' ? 'Guardar Deuda' : 'Confirmar cobro'}
-          </button>
-        </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
