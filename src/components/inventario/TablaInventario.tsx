@@ -331,26 +331,27 @@ export default function TablaInventario() {
         </button>
       </div>
 
-      <div class="inv-filtros-chips" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0rem', padding: '0 1rem' }}>
+      <div class="inv-filtros-chips" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5%', flexWrap: 'wrap', padding: '0.6rem 1rem', background: '#f0b429', borderRadius: '8px' }}>
+        <span style={{ fontWeight: 'bold', color: '#0f1117', marginRight: '0.5rem', fontSize: '0.9rem' }}>Filtrar:</span>
         <button
           onClick={() => setFiltroEstado(f => f === 'activos' ? 'todos' : 'activos')}
-          style={{ background: filtroEstado === 'activos' ? 'var(--accent)' : 'var(--bg3)', color: filtroEstado === 'activos' ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+          style={{ background: filtroEstado === 'activos' ? '#0f1117' : 'rgba(0,0,0,0.12)', color: filtroEstado === 'activos' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >Activos</button>
         <button
           onClick={() => setFiltroEstado(f => f === 'inactivos' ? 'todos' : 'inactivos')}
-          style={{ background: filtroEstado === 'inactivos' ? 'var(--accent)' : 'var(--bg3)', color: filtroEstado === 'inactivos' ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+          style={{ background: filtroEstado === 'inactivos' ? '#0f1117' : 'rgba(0,0,0,0.12)', color: filtroEstado === 'inactivos' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >Inactivos</button>
         <button
           onClick={() => setFiltroMoneda(f => f === 'BS' ? 'todos' : 'BS')}
-          style={{ background: filtroMoneda === 'BS' ? 'var(--accent)' : 'var(--bg3)', color: filtroMoneda === 'BS' ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+          style={{ background: filtroMoneda === 'BS' ? '#0f1117' : 'rgba(0,0,0,0.12)', color: filtroMoneda === 'BS' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >Solo Bs</button>
         <button
           onClick={() => setFiltroMoneda(f => f === 'USD' ? 'todos' : 'USD')}
-          style={{ background: filtroMoneda === 'USD' ? 'var(--accent)' : 'var(--bg3)', color: filtroMoneda === 'USD' ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+          style={{ background: filtroMoneda === 'USD' ? '#0f1117' : 'rgba(0,0,0,0.12)', color: filtroMoneda === 'USD' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >Solo $</button>
         <button
           onClick={() => setSoloStockBajo(!soloStockBajo)}
-          style={{ background: soloStockBajo ? 'var(--accent)' : 'var(--bg3)', color: soloStockBajo ? 'white' : 'var(--text)', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold' }}
+          style={{ background: soloStockBajo ? '#0f1117' : 'rgba(0,0,0,0.12)', color: soloStockBajo ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >⚠️ Stock Bajo</button>
       </div>
 
@@ -438,7 +439,7 @@ export default function TablaInventario() {
               {/* ── Columna Izquierda: Info Básica ── */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '0.2rem', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Información Básica</h3>
-                
+
                 <div class="form-group">
                   <label for="f-nombre">Nombre *</label>
                   <input id="f-nombre" type="text" style={{ textTransform: 'uppercase' }} value={form.nombre} onInput={handleNombreInput} onBlur={handleNombreBlur} placeholder="Nombre del producto" />
@@ -484,7 +485,7 @@ export default function TablaInventario() {
               {/* ── Columna Derecha: Precios y Stock ── */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '0.2rem', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Precios y Stock</h3>
-                
+
                 <div class="form-group price-basis-group" style={{ marginBottom: '0.2rem' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text2)', display: 'block', marginBottom: '0.5rem' }}>
                     Moneda Base (origen del precio):

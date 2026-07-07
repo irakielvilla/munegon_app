@@ -190,7 +190,7 @@ input[type="number"] {
   border: 1px solid var(--border);
   border-radius: var(--card-r);
   overflow: auto;
-  max-height: calc(100vh - 185px);
+  max-height: calc(100vh - 200px);
 }
 
 .inv-table {
@@ -1290,4 +1290,15 @@ input[type="number"] {
 .anim-jump-attention {
   animation: jump-attention 2.5s ease-in-out infinite;
   transform-origin: bottom center;
+}
+
+/* ── Filtros Chips Hover ────────────────────────────────────────── */
+.inv-filtros-chips button {
+  transition: transform 0.15s, box-shadow 0.2s, background-color 0.2s, color 0.2s, outline 0.2s !important;
+}
+
+.inv-filtros-chips button:hover {
+  transform: translateY(-2px);
+  outline: 2px solid var(--accent);
+  box-shadow: 0 6px 22px rgba(108, 99, 255, 0.75);
 }
