@@ -51,6 +51,7 @@ model Producto {
   stock         Int      @default(0)
   stockMinimo   Int      @default(5) // Alerta de stock bajo
   activo        Boolean  @default(true)
+  eliminado     Boolean  @default(false)
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
   isSynced      Boolean  @default(false) // Flag Offline-First: false = pendiente de subir

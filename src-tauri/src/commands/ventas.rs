@@ -96,7 +96,7 @@ pub fn listar_productos() -> Result<Vec<Producto>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, sku, nombre, descripcion, monedaBase, precio, stock, stockMinimo, activo
-             FROM Producto WHERE activo = 1
+             FROM Producto WHERE activo = 1 AND eliminado = 0
              ORDER BY nombre ASC",
         )
         .map_err(|e| e.to_string())?;
@@ -127,7 +127,8 @@ pub fn listar_productos_admin() -> Result<Vec<Producto>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, sku, nombre, descripcion, monedaBase, precio, stock, stockMinimo, activo
-             FROM Producto ORDER BY nombre ASC",
+             FROM Producto WHERE eliminado = 0
+             ORDER BY nombre ASC",
         )
         .map_err(|e| e.to_string())?;
 
@@ -199,7 +200,7 @@ pub fn actualizar_producto(
 pub fn eliminar_producto(id: String) -> Result<(), String> {
     let conn = open_db().map_err(|e| e.to_string())?;
     conn.execute(
-        "DELETE FROM Producto WHERE id = ?1",
+        "UPDATE Producto SET eliminado = 1, activo = 0, isSynced = 0, actualizadoEn = datetime('now') WHERE id = ?1",
         params![id],
     )
     .map_err(|e| e.to_string())?;

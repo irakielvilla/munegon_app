@@ -7,6 +7,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { api } from '../../lib/api';
 import { requireAuth } from '@lib/auth';
 import ModalOverlay from '../ui/ModalOverlay';
+import { usdABs, bsAUsd, formatMoneda, parsePrecioDB } from '../../lib/moneda';
 
 interface Producto {
   id: string;
@@ -162,13 +163,11 @@ export default function TablaInventario() {
     if (p.monedaBase === 'BS') {
       setSeBasaEn('BS');
       setPrecioBSInput(p.precio);
-      const bsNum = parseFloat(p.precio) || 0;
-      setPrecioUSDInput(tasa > 0 ? (bsNum / tasa).toFixed(4) : '0.0000');
+      setPrecioUSDInput(bsAUsd(p.precio, tasa));
     } else {
       setSeBasaEn('USD');
       setPrecioUSDInput(p.precio);
-      const usdNum = parseFloat(p.precio) || 0;
-      setPrecioBSInput((usdNum * tasa).toFixed(4));
+      setPrecioBSInput(usdABs(p.precio, tasa));
     }
 
     setModal('editar');
@@ -190,23 +189,15 @@ export default function TablaInventario() {
   const handleUSDInput = (e: Event) => {
     const val = (e.target as HTMLInputElement).value;
     setPrecioUSDInput(val);
-    const usdNum = parseFloat(val);
-    if (!isNaN(usdNum)) {
-      setPrecioBSInput((usdNum * tasa).toFixed(4));
-    } else {
-      setPrecioBSInput('');
-    }
+    if (!val) setPrecioBSInput('');
+    else setPrecioBSInput(usdABs(val, tasa));
   };
 
   const handleBSInput = (e: Event) => {
     const val = (e.target as HTMLInputElement).value;
     setPrecioBSInput(val);
-    const bsNum = parseFloat(val);
-    if (!isNaN(bsNum)) {
-      setPrecioUSDInput(tasa > 0 ? (bsNum / tasa).toFixed(4) : '0.0000');
-    } else {
-      setPrecioUSDInput('');
-    }
+    if (!val) setPrecioUSDInput('');
+    else setPrecioUSDInput(bsAUsd(val, tasa));
   };
 
   const handleGuardar = async () => {
@@ -219,8 +210,8 @@ export default function TablaInventario() {
     setGuardando(true);
     try {
       const finalPrecio = isUSD
-        ? String((parseFloat(precioUSDInput) || 0).toFixed(4))
-        : String((parseFloat(precioBSInput) || 0).toFixed(4));
+        ? parsePrecioDB(precioUSDInput)
+        : parsePrecioDB(precioBSInput);
 
       const payload = {
         sku: form.sku,
@@ -335,23 +326,23 @@ export default function TablaInventario() {
         <span style={{ fontWeight: 'bold', color: '#0f1117', marginRight: '0.5rem', fontSize: '0.9rem' }}>Filtrar:</span>
         <button
           onClick={() => setFiltroEstado(f => f === 'activos' ? 'todos' : 'activos')}
-          style={{ background: filtroEstado === 'activos' ? '#0f1117' : 'rgba(0,0,0,0.12)', color: filtroEstado === 'activos' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+          style={{ background: filtroEstado === 'activos' ? '#0f1117' : 'rgba(0,0,0,0.4)', color: filtroEstado === 'activos' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >Activos</button>
         <button
           onClick={() => setFiltroEstado(f => f === 'inactivos' ? 'todos' : 'inactivos')}
-          style={{ background: filtroEstado === 'inactivos' ? '#0f1117' : 'rgba(0,0,0,0.12)', color: filtroEstado === 'inactivos' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+          style={{ background: filtroEstado === 'inactivos' ? '#0f1117' : 'rgba(0,0,0,0.4)', color: filtroEstado === 'inactivos' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >Inactivos</button>
         <button
           onClick={() => setFiltroMoneda(f => f === 'BS' ? 'todos' : 'BS')}
-          style={{ background: filtroMoneda === 'BS' ? '#0f1117' : 'rgba(0,0,0,0.12)', color: filtroMoneda === 'BS' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+          style={{ background: filtroMoneda === 'BS' ? '#0f1117' : 'rgba(0,0,0,0.4)', color: filtroMoneda === 'BS' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >Solo Bs</button>
         <button
           onClick={() => setFiltroMoneda(f => f === 'USD' ? 'todos' : 'USD')}
-          style={{ background: filtroMoneda === 'USD' ? '#0f1117' : 'rgba(0,0,0,0.12)', color: filtroMoneda === 'USD' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+          style={{ background: filtroMoneda === 'USD' ? '#0f1117' : 'rgba(0,0,0,0.4)', color: filtroMoneda === 'USD' ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >Solo $</button>
         <button
           onClick={() => setSoloStockBajo(!soloStockBajo)}
-          style={{ background: soloStockBajo ? '#0f1117' : 'rgba(0,0,0,0.12)', color: soloStockBajo ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+          style={{ background: soloStockBajo ? '#0f1117' : 'rgba(0,0,0,0.4)', color: soloStockBajo ? '#f0b429' : '#0f1117', border: 'none', borderRadius: '20px', padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
         >⚠️ Stock Bajo</button>
       </div>
 
@@ -385,16 +376,16 @@ export default function TablaInventario() {
                   <td class="td-precio">
                     {p.monedaBase === 'BS' ? (
                       <div>
-                        <div style={{ fontWeight: 'bold' }}>{parseFloat(p.precio).toFixed(2)} Bs</div>
+                        <div style={{ fontWeight: 'bold' }}>{formatMoneda(p.precio)} Bs</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text2)', fontWeight: 'normal' }}>
-                          ~ ${(tasa > 0 ? parseFloat(p.precio) / tasa : 0).toFixed(2)} USD
+                          ~ ${formatMoneda(bsAUsd(p.precio, tasa))} USD
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <div style={{ fontWeight: 'bold' }}>${parseFloat(p.precio).toFixed(2)} USD</div>
+                        <div style={{ fontWeight: 'bold' }}>${formatMoneda(p.precio)} USD</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text2)', fontWeight: 'normal' }}>
-                          ~ {(parseFloat(p.precio) * tasa).toFixed(2)} Bs
+                          ~ {formatMoneda(usdABs(p.precio, tasa))} Bs
                         </div>
                       </div>
                     )}

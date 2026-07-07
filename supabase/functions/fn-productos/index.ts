@@ -38,6 +38,7 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase
         .from('Producto')
         .select('*')
+        .eq('eliminado', false)
         .eq('activo', true)
         .gt('stock', 0)
         .order('nombre')
@@ -52,6 +53,7 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase
         .from('Producto')
         .select('*')
+        .eq('eliminado', false)
         .order('nombre')
       if (error) throw error
       return new Response(JSON.stringify(data), {
@@ -89,7 +91,7 @@ Deno.serve(async (req) => {
       const { id } = body
       const { error } = await supabase
         .from('Producto')
-        .delete()
+        .update({ eliminado: true, activo: false })
         .eq('id', id)
       if (error) throw error
       return new Response(JSON.stringify({ ok: true }), {
