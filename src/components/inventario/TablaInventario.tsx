@@ -271,6 +271,23 @@ export default function TablaInventario() {
     }
   };
 
+  const handleEliminar = async (p: Producto) => {
+    if (p.activo) {
+      flashMsg('error', 'El producto debe estar inactivo para poder eliminarlo.');
+      return;
+    }
+    const confirm = window.confirm(`¿Estás seguro de que quieres eliminar permanentemente el producto "${p.nombre}"?`);
+    if (!confirm) return;
+
+    try {
+      await api.eliminar_producto(p.id);
+      flashMsg('ok', '✅ Producto eliminado permanentemente');
+      cargar();
+    } catch (e) {
+      flashMsg('error', `Error eliminando: ${e}`);
+    }
+  };
+
   const filtered = productos.filter((p) => {
     const matchBusqueda =
       busqueda === '' ||
@@ -395,6 +412,11 @@ export default function TablaInventario() {
                     <button id={`toggle-${p.id}`} class="btn-action toggle" onClick={() => toggleActivo(p)}>
                       {p.activo ? '🔒' : '🔓'}
                     </button>
+                    {!p.activo && (
+                      <button id={`eliminar-${p.id}`} class="btn-action btn-eliminar-item" onClick={() => handleEliminar(p)}>
+                        🗑️
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

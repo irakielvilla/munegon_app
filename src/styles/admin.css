@@ -2,6 +2,10 @@
    MUÑEGON POS — Estilos compartidos Admin (Inventario + Reportes)
    ══════════════════════════════════════════════════════════════ */
 
+html {
+  font-size: 20.5px;
+}
+
 :root {
   --bg: #0f1117;
   --bg2: #161b27;
@@ -47,8 +51,7 @@ input[type="number"] {
 /* ── Admin Container ────────────────────────────────────────── */
 .inv-container,
 .rep-container {
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: 100%;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -187,7 +190,7 @@ input[type="number"] {
   border: 1px solid var(--border);
   border-radius: var(--card-r);
   overflow: auto;
-  max-height: calc(100vh - 240px);
+  max-height: calc(100vh - 185px);
 }
 
 .inv-table {

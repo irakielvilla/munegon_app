@@ -194,6 +194,18 @@ pub fn actualizar_producto(
     Ok(())
 }
 
+// ── Commands: Eliminar Producto ────────────────────────────────
+#[tauri::command]
+pub fn eliminar_producto(id: String) -> Result<(), String> {
+    let conn = open_db().map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM Producto WHERE id = ?1",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // ── Commands: Configuración ───────────────────────────────────
 
 #[tauri::command]

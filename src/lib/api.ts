@@ -367,6 +367,11 @@ export const api = {
     await callEdge<{ ok: boolean }>('fn-productos', { accion: 'actualizar', ...payload });
   },
 
+  eliminar_producto: async (id: string): Promise<void> => {
+    if (isTauri()) return invokeTauri<void>('eliminar_producto', { id });
+    await callEdge<{ ok: boolean }>('fn-productos', { accion: 'eliminar', id });
+  },
+
   // ── CONFIGURACIÓN ──
   obtener_configuracion: async (): Promise<ConfigApp> => {
     if (isTauri()) return invokeTauri<ConfigApp>('obtener_configuracion');

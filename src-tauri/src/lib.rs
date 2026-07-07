@@ -72,6 +72,7 @@ pub fn run() {
             commands::ventas::listar_productos_admin,
             commands::ventas::crear_producto,
             commands::ventas::actualizar_producto,
+            commands::ventas::eliminar_producto,
             // Configuración (tasa de cambio, IVA, etc.)
             commands::ventas::obtener_configuracion,
             commands::ventas::actualizar_configuracion,

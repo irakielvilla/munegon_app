@@ -84,6 +84,19 @@ Deno.serve(async (req) => {
       })
     }
 
+    // ── Eliminar producto ───────────────────────────────────
+    if (accion === 'eliminar') {
+      const { id } = body
+      const { error } = await supabase
+        .from('Producto')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     return new Response(JSON.stringify({ error: `Acción desconocida: ${accion}` }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
