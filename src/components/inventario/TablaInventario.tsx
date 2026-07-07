@@ -178,13 +178,13 @@ export default function TablaInventario() {
 
   const handleNombreInput = (e: Event) => {
     const val = (e.target as HTMLInputElement).value.toUpperCase();
-    setForm((f) => {
-      const updated = { ...f, nombre: val };
-      if (modal === 'nuevo' && !skuEdited) {
-        updated.sku = generateSKU(val);
-      }
-      return updated;
-    });
+    setForm((f) => ({ ...f, nombre: val }));
+  };
+
+  const handleNombreBlur = () => {
+    if (modal === 'nuevo' && !skuEdited && form.nombre.trim()) {
+      setForm((f) => ({ ...f, sku: generateSKU(f.nombre) }));
+    }
   };
 
   const handleUSDInput = (e: Event) => {
@@ -434,8 +434,16 @@ export default function TablaInventario() {
               <button class="modal-close" onClick={cerrarModal}>✕</button>
             </div>
 
-            <div class="inv-form">
-              <div class="form-row">
+            <div class="inv-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.25rem' }}>
+              {/* ── Columna Izquierda: Info Básica ── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <h3 style={{ fontSize: '0.9rem', marginBottom: '0.2rem', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Información Básica</h3>
+                
+                <div class="form-group">
+                  <label for="f-nombre">Nombre *</label>
+                  <input id="f-nombre" type="text" style={{ textTransform: 'uppercase' }} value={form.nombre} onInput={handleNombreInput} onBlur={handleNombreBlur} placeholder="Nombre del producto" />
+                </div>
+
                 <div class="form-group">
                   <div class="sku-label-row">
                     <label for="f-sku">SKU *</label>
@@ -464,7 +472,42 @@ export default function TablaInventario() {
                     placeholder="EJ-001"
                   />
                 </div>
-                <div class="form-row-nested" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+
+                <div class="form-group">
+                  <label for="f-desc" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    Descripción <span style={{ fontSize: '1rem', lineHeight: 1 }}>ℹ️</span>
+                  </label>
+                  <input id="f-desc" type="text" style={{ textTransform: 'uppercase' }} value={form.descripcion ?? ''} onInput={(e) => setField('descripcion', (e.target as HTMLInputElement).value.toUpperCase())} placeholder="Opcional" />
+                </div>
+              </div>
+
+              {/* ── Columna Derecha: Precios y Stock ── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <h3 style={{ fontSize: '0.9rem', marginBottom: '0.2rem', color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Precios y Stock</h3>
+                
+                <div class="form-group price-basis-group" style={{ marginBottom: '0.2rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text2)', display: 'block', marginBottom: '0.5rem' }}>
+                    Moneda Base (origen del precio):
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSeBasaEn('USD')}
+                      style={{ flex: 1, padding: '0.4rem', borderRadius: '8px', border: seBasaEn === 'USD' ? '1px solid var(--accent)' : '1px solid var(--border)', background: seBasaEn === 'USD' ? 'rgba(108, 99, 255, 0.15)' : 'var(--bg3)', color: seBasaEn === 'USD' ? 'var(--accent)' : 'var(--text2)', cursor: 'pointer', fontWeight: seBasaEn === 'USD' ? 'bold' : 'normal', transition: 'all 0.2s', fontSize: '0.85rem' }}
+                    >
+                      $ Dólares
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSeBasaEn('BS')}
+                      style={{ flex: 1, padding: '0.4rem', borderRadius: '8px', border: seBasaEn === 'BS' ? '1px solid var(--accent)' : '1px solid var(--border)', background: seBasaEn === 'BS' ? 'rgba(108, 99, 255, 0.15)' : 'var(--bg3)', color: seBasaEn === 'BS' ? 'var(--accent)' : 'var(--text2)', cursor: 'pointer', fontWeight: seBasaEn === 'BS' ? 'bold' : 'normal', transition: 'all 0.2s', fontSize: '0.85rem' }}
+                    >
+                      Bs Bolívares
+                    </button>
+                  </div>
+                </div>
+
+                <div class="form-row">
                   <div class="form-group">
                     <label for="f-precio">Precio USD *</label>
                     <input
@@ -475,6 +518,7 @@ export default function TablaInventario() {
                       value={precioUSDInput}
                       onInput={handleUSDInput}
                       placeholder="0.0000"
+                      style={seBasaEn === 'USD' ? { borderColor: 'var(--accent)' } : {}}
                     />
                   </div>
                   <div class="form-group">
@@ -487,56 +531,20 @@ export default function TablaInventario() {
                       value={precioBSInput}
                       onInput={handleBSInput}
                       placeholder="0.0000"
+                      style={seBasaEn === 'BS' ? { borderColor: 'var(--accent)' } : {}}
                     />
                   </div>
                 </div>
-              </div>
-              <div class="form-group">
-                <label for="f-nombre">Nombre *</label>
-                <input id="f-nombre" type="text" style={{ textTransform: 'uppercase' }} value={form.nombre} onInput={handleNombreInput} placeholder="Nombre del producto" />
-              </div>
-              <div class="form-group">
-                <label for="f-desc" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  Descripción <span style={{ fontSize: '1rem', lineHeight: 1 }}>ℹ️</span>
-                </label>
-                <input id="f-desc" type="text" style={{ textTransform: 'uppercase' }} value={form.descripcion ?? ''} onInput={(e) => setField('descripcion', (e.target as HTMLInputElement).value.toUpperCase())} placeholder="Opcional" />
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="f-stock">Stock inicial</label>
-                  <input id="f-stock" type="number" min="0" value={form.stock} onInput={(e) => setField('stock', parseInt((e.target as HTMLInputElement).value) || 0)} />
-                </div>
-                <div class="form-group">
-                  <label for="f-stock-min">Stock mínimo</label>
-                  <input id="f-stock-min" type="number" min="0" value={form.stockMinimo} onInput={(e) => setField('stockMinimo', parseInt((e.target as HTMLInputElement).value) || 0)} />
-                </div>
-              </div>
 
-              <div class="form-group price-basis-group" style={{ marginTop: '0.5rem', marginBottom: '0.75rem' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text2)', display: 'block', marginBottom: '0.4rem' }}>
-                  El precio del producto se basa en:
-                </span>
-                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text)', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="basePrecio"
-                      checked={seBasaEn === 'BS'}
-                      onChange={() => setSeBasaEn('BS')}
-                      style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
-                    />
-                    Bs (Bolívares)
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text)', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="basePrecio"
-                      checked={seBasaEn === 'USD'}
-                      onChange={() => setSeBasaEn('USD')}
-                      style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
-                    />
-                    $ (Dólares)
-                  </label>
+                <div class="form-row" style={{ marginTop: '0.2rem' }}>
+                  <div class="form-group">
+                    <label for="f-stock">Stock inicial</label>
+                    <input id="f-stock" type="number" min="0" value={form.stock} onInput={(e) => setField('stock', parseInt((e.target as HTMLInputElement).value) || 0)} />
+                  </div>
+                  <div class="form-group">
+                    <label for="f-stock-min">Stock mínimo</label>
+                    <input id="f-stock-min" type="number" min="0" value={form.stockMinimo} onInput={(e) => setField('stockMinimo', parseInt((e.target as HTMLInputElement).value) || 0)} />
+                  </div>
                 </div>
               </div>
             </div>

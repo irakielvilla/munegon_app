@@ -1,0 +1,58 @@
+<h2>¿Cómo prefieres organizar el Modal de Producto?</h2>
+<p class="subtitle">Selecciona el diseño que te parezca más limpio y rápido de usar para el cajero/administrador.</p>
+
+<div class="options">
+  <div class="option" data-choice="columnas" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Diseño en Dos Columnas</h3>
+      <p>Aprovecha el ancho de la pantalla para separar la información básica (izquierda) de los precios y stock (derecha).</p>
+      <div class="mockup" style="margin-top: 1rem; font-size: 0.85rem;">
+        <div class="mockup-header" style="padding: 0.5rem; background: var(--bg3);">+ Nuevo Producto</div>
+        <div style="display: flex; gap: 1rem; padding: 1rem;">
+          <div style="flex: 1; border-right: 1px solid var(--border); padding-right: 1rem;">
+            <div class="label" style="margin-bottom: 0.5rem; color: var(--text2);">Información Básica</div>
+            <input class="mock-input" style="width: 100%; margin-bottom: 0.5rem;" placeholder="Nombre">
+            <input class="mock-input" style="width: 100%; margin-bottom: 0.5rem;" placeholder="SKU (Generado auto)">
+            <input class="mock-input" style="width: 100%;" placeholder="Descripción">
+          </div>
+          <div style="flex: 1;">
+            <div class="label" style="margin-bottom: 0.5rem; color: var(--text2);">Precios y Stock</div>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <input class="mock-input" style="width: 50%;" placeholder="Precio USD">
+              <input class="mock-input" style="width: 50%;" placeholder="Precio Bs">
+            </div>
+            <div style="margin-bottom: 0.5rem; color: var(--text2); font-size: 0.75rem;">El precio se basa en: [x] USD  [ ] Bs</div>
+            <div style="display: flex; gap: 0.5rem;">
+               <input class="mock-input" style="width: 50%;" placeholder="Stock">
+               <input class="mock-input" style="width: 50%;" placeholder="Stock Mínimo">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="pestanas" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Diseño por Pestañas (Tabs)</h3>
+      <p>Mantiene el modal angosto, dividiendo la información en dos pestañas claras. Menos ruido visual a la vez.</p>
+      <div class="mockup" style="margin-top: 1rem; font-size: 0.85rem; max-width: 350px;">
+        <div class="mockup-header" style="padding: 0.5rem; background: var(--bg3);">+ Nuevo Producto</div>
+        <div style="display: flex; border-bottom: 1px solid var(--border);">
+          <div style="padding: 0.5rem 1rem; border-bottom: 2px solid var(--accent); color: var(--text);">General</div>
+          <div style="padding: 0.5rem 1rem; color: var(--text2);">Precios / Stock</div>
+        </div>
+        <div style="padding: 1rem;">
+            <input class="mock-input" style="width: 100%; margin-bottom: 0.5rem;" placeholder="Nombre">
+            <input class="mock-input" style="width: 100%; margin-bottom: 0.5rem;" placeholder="SKU (Generado auto)">
+            <input class="mock-input" style="width: 100%; margin-bottom: 1rem;" placeholder="Descripción">
+            <div style="display: flex; justify-content: flex-end;">
+               <button class="mock-button" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">Siguiente &rarr;</button>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

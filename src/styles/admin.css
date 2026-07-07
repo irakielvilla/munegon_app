@@ -388,7 +388,7 @@ input[type="number"] {
 }
 
 .modal-card.inv-modal {
-  width: min(640px, 94vw);
+  width: min(780px, 94vw);
 }
 
 .inv-modal {
