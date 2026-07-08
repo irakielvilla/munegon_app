@@ -130,6 +130,12 @@ fn ejecutar_migraciones(conn: &mut Connection) -> rusqlite::Result<()> {
              );"
         );
 
+        // Migración 9: Añadir eliminado a Producto
+        let _ = conn.execute(
+            "ALTER TABLE Producto ADD COLUMN eliminado BOOLEAN NOT NULL DEFAULT 0",
+            [],
+        );
+
     Ok(())
 }
 
@@ -156,6 +162,7 @@ fn inicializar_tablas(conn: &Connection) -> rusqlite::Result<()> {
              stock INTEGER NOT NULL DEFAULT 0,
              stockMinimo INTEGER NOT NULL DEFAULT 5,
              activo INTEGER NOT NULL DEFAULT 1,
+             eliminado BOOLEAN NOT NULL DEFAULT 0,
              creadoEn TEXT NOT NULL DEFAULT (datetime('now')),
              actualizadoEn TEXT NOT NULL DEFAULT (datetime('now')),
              isSynced INTEGER NOT NULL DEFAULT 0
