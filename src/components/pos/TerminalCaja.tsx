@@ -52,8 +52,8 @@ interface ConteoFisico {
 }
 
 const NOMBRES_CAMPOS: Record<keyof ConteoFisico, string> = {
-  bsEfectivo:  'Efectivo Bs',
-  bsDebito:    'Débito Bs',
+  bsEfectivo: 'Efectivo Bs',
+  bsDebito: 'Débito Bs',
   bsPagoMovil: 'Pago Móvil Bs',
   usdEfectivo: 'Efectivo $',
 };
@@ -173,7 +173,7 @@ function Reloj() {
   const minutos = fecha.getMinutes().toString().padStart(2, '0');
   const ampm = horas >= 12 ? 'pm' : 'am';
   horas = horas % 12;
-  horas = horas ? horas : 12; 
+  horas = horas ? horas : 12;
   const strHora = `${horas}:${minutos}${ampm}`;
 
   return (
@@ -207,7 +207,7 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
   const [cargandoClientes, setCargandoClientes] = useState(false);
   const [busquedaCliente, setBusquedaCliente] = useState('');
 
-  const clientesFiltrados = clientes.filter(c => 
+  const clientesFiltrados = clientes.filter(c =>
     `${c.nombre} ${c.apellido}`.toLowerCase().includes(busquedaCliente.toLowerCase())
   );
 
@@ -255,7 +255,7 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: ModalPagoProps) {
       setNuevoApellido('');
       setNuevoTelefono('');
       setCreandoCliente(false);
-      
+
       const lista = await api.listar_clientes();
       setClientes(lista);
       setClienteId(id);
@@ -499,10 +499,10 @@ function PopupAdvertencia({ camposEnCero, onConfirmar, onCancelar }: PopupAdvert
 // ── Filas del modal ────────────────────────────────────────────
 
 const FILAS_CORTE = [
-  { key: 'bsEfectivo'  as keyof ConteoFisico, icono: '💴', label: 'Efectivo Bs',   unidad: 'Bs'  },
-  { key: 'bsDebito'    as keyof ConteoFisico, icono: '💳', label: 'Débito Bs',     unidad: 'Bs'  },
-  { key: 'bsPagoMovil' as keyof ConteoFisico, icono: '📱', label: 'Pago Móvil Bs', unidad: 'Bs'  },
-  { key: 'usdEfectivo' as keyof ConteoFisico, icono: '💵', label: 'Efectivo $',    unidad: 'USD' },
+  { key: 'bsEfectivo' as keyof ConteoFisico, icono: '💴', label: 'Efectivo Bs', unidad: 'Bs' },
+  { key: 'bsDebito' as keyof ConteoFisico, icono: '💳', label: 'Débito Bs', unidad: 'Bs' },
+  { key: 'bsPagoMovil' as keyof ConteoFisico, icono: '📱', label: 'Pago Móvil Bs', unidad: 'Bs' },
+  { key: 'usdEfectivo' as keyof ConteoFisico, icono: '💵', label: 'Efectivo $', unidad: 'USD' },
 ] as const;
 
 // ── Componente principal ───────────────────────────────────────
@@ -736,7 +736,7 @@ export default function TerminalCaja() {
   // ── Totales ───────────────────────────────────────────────
 
   const tasaNum = parseFloat(config.tasa_cambio_bsd) || 1;
-  
+
   const getProductPriceUSD = (p: Producto, currentTasa: number): number => {
     const rawPrice = parseFloat(p.precio) || 0;
     return p.monedaBase === 'BS' ? rawPrice / currentTasa : rawPrice;
@@ -861,8 +861,8 @@ export default function TerminalCaja() {
 
       // Guardar totalDeclarado como JSON del conteo por forma de pago
       const totalDeclaradoStr = JSON.stringify({
-        bsEfectivo:  fmt2(parseFloat(conteo.bsEfectivo)  || 0),
-        bsDebito:    fmt2(parseFloat(conteo.bsDebito)    || 0),
+        bsEfectivo: fmt2(parseFloat(conteo.bsEfectivo) || 0),
+        bsDebito: fmt2(parseFloat(conteo.bsDebito) || 0),
         bsPagoMovil: fmt2(parseFloat(conteo.bsPagoMovil) || 0),
         usdEfectivo: fmt2(declaradoUSD),
         totalUsdEquiv: fmt2(declaradoTotalUsdEquiv),
@@ -952,13 +952,13 @@ export default function TerminalCaja() {
             />
           </div>
 
-          <div class="caja-tabs" style={{ display: 'flex', gap: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+          <div class="caja-tabs" style={{ display: 'flex', gap: '1rem', margin: '0.45rem 0.8rem', height: '5%' }}>
             <button
               type="button"
               class={activeTab === 'productos' ? 'btn-tab active' : 'btn-tab'}
               onClick={() => setActiveTab('productos')}
               style={{
-                flex: 1, padding: '0.8rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer',
+                flex: 1, padding: '0.3rem 0rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer',
                 background: activeTab === 'productos' ? 'var(--accent)' : 'var(--bg3)',
                 color: activeTab === 'productos' ? 'white' : 'var(--text)'
               }}
@@ -970,7 +970,7 @@ export default function TerminalCaja() {
               class={activeTab === 'servicios' ? 'btn-tab active' : 'btn-tab'}
               onClick={() => setActiveTab('servicios')}
               style={{
-                flex: 1, padding: '0.8rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer',
+                flex: 1, padding: '0.3rem 0rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer',
                 background: activeTab === 'servicios' ? 'var(--accent)' : 'var(--bg3)',
                 color: activeTab === 'servicios' ? 'white' : 'var(--text)'
               }}
@@ -980,62 +980,62 @@ export default function TerminalCaja() {
           </div>
 
           {activeTab === 'productos' && (
-          <div class="productos-grid">
-            {productosFiltrados.length === 0 ? (
-              <div class="empty-state">
-                {busqueda ? 'Sin resultados' : 'No hay productos disponibles'}
-              </div>
-            ) : (
-              productosFiltrados.map((p) => {
-                const enCarrito = carrito.find((l) => l.producto.id === p.id);
-                const agotado = p.stock <= 0;
-                return (
-                  <button
-                    type="button"
-                    key={p.id}
-                    id={`prod-${p.id}`}
-                    class={`producto-card ${enCarrito ? 'en-carrito' : ''} ${agotado ? 'producto-agotado' : ''}`}
-                    onClick={() => agregarAlCarrito(p)}
-                    disabled={agotado}
-                  >
-                    {p.descripcion && (
-                      <div class="prod-desc-indicador">
-                        ℹ️
-                        <div class="prod-desc-tooltip">{p.descripcion}</div>
+            <div class="productos-grid">
+              {productosFiltrados.length === 0 ? (
+                <div class="empty-state">
+                  {busqueda ? 'Sin resultados' : 'No hay productos disponibles'}
+                </div>
+              ) : (
+                productosFiltrados.map((p) => {
+                  const enCarrito = carrito.find((l) => l.producto.id === p.id);
+                  const agotado = p.stock <= 0;
+                  return (
+                    <button
+                      type="button"
+                      key={p.id}
+                      id={`prod-${p.id}`}
+                      class={`producto-card ${enCarrito ? 'en-carrito' : ''} ${agotado ? 'producto-agotado' : ''}`}
+                      onClick={() => agregarAlCarrito(p)}
+                      disabled={agotado}
+                    >
+                      {p.descripcion && (
+                        <div class="prod-desc-indicador">
+                          ℹ️
+                          <div class="prod-desc-tooltip">{p.descripcion}</div>
+                        </div>
+                      )}
+                      <span class="prod-nombre">{p.nombre}</span>
+                      <span class="prod-sku">{p.sku}</span>
+                      <span class={`prod-stock ${agotado ? 'stock-agotado' : p.stock <= 5 ? 'stock-bajo' : ''}`}>
+                        {agotado ? 'AGOTADO' : `Stock: ${p.stock}`}
+                      </span>
+                      <div class="prod-footer">
+                        <div class="prod-precio-container">
+                          {p.monedaBase === 'BS' ? (
+                            <>
+                              <span class="prod-precio">Bs {fmtBs(parseFloat(p.precio) || 0)}</span>
+                              <span class="prod-precio-usd">${((parseFloat(p.precio) || 0) / tasaNum).toFixed(2)} USD</span>
+                            </>
+                          ) : (
+                            <>
+                              <span class="prod-precio">${(parseFloat(p.precio) || 0).toFixed(2)} USD</span>
+                              <span class="prod-precio-usd">~ Bs {fmtBs((parseFloat(p.precio) || 0) * tasaNum)}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    )}
-                    <span class="prod-nombre">{p.nombre}</span>
-                    <span class="prod-sku">{p.sku}</span>
-                    <span class={`prod-stock ${agotado ? 'stock-agotado' : p.stock <= 5 ? 'stock-bajo' : ''}`}>
-                      {agotado ? 'AGOTADO' : `Stock: ${p.stock}`}
-                    </span>
-                    <div class="prod-footer">
-                      <div class="prod-precio-container">
-                        {p.monedaBase === 'BS' ? (
-                          <>
-                            <span class="prod-precio">Bs {fmtBs(parseFloat(p.precio) || 0)}</span>
-                            <span class="prod-precio-usd">${((parseFloat(p.precio) || 0) / tasaNum).toFixed(2)} USD</span>
-                          </>
-                        ) : (
-                          <>
-                            <span class="prod-precio">${(parseFloat(p.precio) || 0).toFixed(2)} USD</span>
-                            <span class="prod-precio-usd">~ Bs {fmtBs((parseFloat(p.precio) || 0) * tasaNum)}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {enCarrito && (
-                      <div class="badge-cantidad">{enCarrito.cantidad}</div>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
+                      {enCarrito && (
+                        <div class="badge-cantidad">{enCarrito.cantidad}</div>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           )}
 
           {activeTab === 'servicios' && (
-            <div class="servicios-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+            <div class="servicios-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', padding: '0.5rem 0.8rem' }}>
               <button type="button" class="producto-card" onClick={() => setModalServicio('avance')}>
                 <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>💸</span>
                 <span class="prod-nombre" style={{ fontSize: '1rem' }}>Avance de Efectivo</span>

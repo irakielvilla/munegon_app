@@ -322,7 +322,7 @@ export default function TablaInventario() {
         </button>
       </div>
 
-      <div class="inv-filtros-chips" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5%', flexWrap: 'wrap', padding: '0.6rem 1rem', background: '#f0b429', borderRadius: '8px' }}>
+      <div class="inv-filtros-chips" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.8%', flexWrap: 'wrap', padding: '0.3rem 1rem', background: '#f0b429', borderRadius: '8px' }}>
         <span style={{ fontWeight: 'bold', color: '#0f1117', marginRight: '0.5rem', fontSize: '0.9rem' }}>Filtrar:</span>
         <button
           onClick={() => setFiltroEstado(f => f === 'activos' ? 'todos' : 'activos')}
@@ -359,8 +359,8 @@ export default function TablaInventario() {
               <th>Precio</th>
               <th>Stock</th>
               <th>Mín.</th>
-              <th>Estado</th>
-              <th>Acciones</th>
+              <th class="th-center">Estado</th>
+              <th class="th-center">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -394,21 +394,23 @@ export default function TablaInventario() {
                     {p.stock <= p.stockMinimo && '⚠️ '}{p.stock}
                   </td>
                   <td class="td-min">{p.stockMinimo}</td>
-                  <td>
+                  <td class="td-estado">
                     <span class={`badge-estado ${p.activo ? 'activo' : 'inactivo'}`}>
                       {p.activo ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
                   <td class="td-actions">
-                    <button id={`editar-${p.id}`} class="btn-action edit" onClick={() => abrirEditar(p)}>✏️</button>
-                    <button id={`toggle-${p.id}`} class="btn-action toggle" onClick={() => toggleActivo(p)}>
-                      {p.activo ? '🔒' : '🔓'}
-                    </button>
-                    {!p.activo && (
-                      <button id={`eliminar-${p.id}`} class="btn-action btn-eliminar-item" onClick={() => handleEliminar(p)}>
-                        🗑️
+                    <div class="actions-wrapper">
+                      <button id={`editar-${p.id}`} class="btn-action edit" onClick={() => abrirEditar(p)}>✏️</button>
+                      <button id={`toggle-${p.id}`} class="btn-action toggle" onClick={() => toggleActivo(p)}>
+                        {p.activo ? '🔒' : '🔓'}
                       </button>
-                    )}
+                      {!p.activo && (
+                        <button id={`eliminar-${p.id}`} class="btn-action btn-eliminar-item" onClick={() => handleEliminar(p)}>
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

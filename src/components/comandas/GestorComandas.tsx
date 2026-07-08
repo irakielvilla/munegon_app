@@ -159,6 +159,10 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: {
   // Client selection state
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [clienteId, setClienteId] = useState<string>('');
+  const [creandoCliente, setCreandoCliente] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevoApellido, setNuevoApellido] = useState('');
+  const [nuevoTelefono, setNuevoTelefono] = useState('');
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [cargandoClientes, setCargandoClientes] = useState(false);
   
@@ -181,6 +185,27 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: {
       console.error(e);
     } finally {
       setCargandoClientes(false);
+    }
+  };
+
+  const handleCrearCliente = async () => {
+    if (!nuevoNombre.trim() || !nuevoApellido.trim()) {
+      alert('Nombre y apellido son obligatorios.');
+      return;
+    }
+    try {
+      const id = await api.crear_cliente(nuevoNombre.trim(), nuevoApellido.trim(), nuevoTelefono.trim() || undefined);
+      alert('Cliente creado correctamente');
+      setNuevoNombre('');
+      setNuevoApellido('');
+      setNuevoTelefono('');
+      setCreandoCliente(false);
+      
+      const lista = await api.listar_clientes();
+      setClientes(lista);
+      setClienteId(id);
+    } catch (e) {
+      alert(`Error creando cliente: ${e}`);
     }
   };
 
@@ -256,43 +281,105 @@ function ModalPago({ totalUSD, tasa, onConfirmar, onCerrar }: {
 
         {forma === 'CUENTA_COBRAR' && (
           <div class="cliente-cobrar-lateral">
-            <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label for="cliente-select" style={{ fontSize: '0.78rem', color: 'var(--text2)' }}>Seleccionar Cliente *</label>
-              <input
-                type="text"
-                placeholder="🔍 Buscar cliente deudor..."
-                value={busquedaCliente}
-                onInput={(e) => setBusquedaCliente((e.target as HTMLInputElement).value)}
-                style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
-              />
-              <div class="cliente-select-row" style={{ flexDirection: 'column', width: '100%' }}>
-                {cargandoClientes ? (
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Cargando clientes...</span>
-                ) : (
-                  <select
-                    id="cliente-select"
-                    value={clienteId}
-                    onChange={(e) => setClienteId((e.target as HTMLSelectElement).value)}
-                    class="cliente-select"
-                    style={{ width: '100%' }}
-                    size={5}
-                  >
-                    {clientesFiltrados.length === 0 ? (
-                      <option value="">No se encontraron clientes</option>
-                    ) : (
-                      clientesFiltrados.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre} {c.apellido}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                )}
+            {!creandoCliente ? (
+              <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label for="cliente-select" style={{ fontSize: '0.78rem', color: 'var(--text2)' }}>Seleccionar Cliente *</label>
+                <button
+                  type="button"
+                  class="btn-nuevo-cliente"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => setCreandoCliente(true)}
+                >
+                  ➕ Nuevo Cliente
+                </button>
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar cliente deudor..."
+                  value={busquedaCliente}
+                  onInput={(e) => setBusquedaCliente((e.target as HTMLInputElement).value)}
+                  style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                />
+                <div class="cliente-select-row" style={{ flexDirection: 'column', width: '100%' }}>
+                  {cargandoClientes ? (
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>Cargando clientes...</span>
+                  ) : (
+                    <select
+                      id="cliente-select"
+                      value={clienteId}
+                      onChange={(e) => setClienteId((e.target as HTMLSelectElement).value)}
+                      class="cliente-select"
+                      style={{ width: '100%' }}
+                      size={5}
+                    >
+                      {clientesFiltrados.length === 0 ? (
+                        <option value="">No se encontraron clientes</option>
+                      ) : (
+                        clientesFiltrados.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre} {c.apellido}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  )}
+                </div>
               </div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text2)', marginTop: '0.5rem' }}>
-                Nota: Debes crear al cliente desde el módulo de Caja si no existe.
-              </span>
-            </div>
+            ) : (
+              <div class="nuevo-cliente-form">
+                <h4>➕ Registrar Nuevo Cliente</h4>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <div class="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <label for="nuevo-nombre" style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Nombre *</label>
+                    <input
+                      id="nuevo-nombre"
+                      type="text"
+                      value={nuevoNombre}
+                      onInput={(e) => setNuevoNombre((e.target as HTMLInputElement).value.toUpperCase())}
+                      placeholder="Ej. DANIEL"
+                      style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none', textTransform: 'uppercase' }}
+                    />
+                  </div>
+                  <div class="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <label for="nuevo-apellido" style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Apellido *</label>
+                    <input
+                      id="nuevo-apellido"
+                      type="text"
+                      value={nuevoApellido}
+                      onInput={(e) => setNuevoApellido((e.target as HTMLInputElement).value.toUpperCase())}
+                      placeholder="Ej. TREJO"
+                      style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none', textTransform: 'uppercase' }}
+                    />
+                  </div>
+                </div>
+                <div class="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.25rem' }}>
+                  <label for="nuevo-telefono" style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Teléfono (Opcional)</label>
+                  <input
+                    id="nuevo-telefono"
+                    type="text"
+                    value={nuevoTelefono}
+                    onInput={(e) => setNuevoTelefono((e.target as HTMLInputElement).value)}
+                    placeholder="Ej. 04121234567"
+                    style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '0.4rem', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+                <div class="nuevo-cliente-actions">
+                  <button
+                    type="button"
+                    class="btn-cancelar-mini"
+                    onClick={() => setCreandoCliente(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-guardar-mini"
+                    onClick={handleCrearCliente}
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -577,7 +664,7 @@ function DetalleComandaVista({
                 const lineaBs = precioUnitNum * l.cantidad * tasaNum;
 
                 return (
-                  <div key={l.id} class="comanda-linea">
+                  <div key={l.id} class="carrito-linea">
                     <div class="linea-info">
                       <span class="linea-nombre">{l.productoNombre}</span>
                       <span class="linea-precio">Bs {fmtBs(lineaBs)}</span>
@@ -591,7 +678,7 @@ function DetalleComandaVista({
                         }}
                         title="Quitar uno"
                       >−</button>
-                      <div class="qty-num-box">{l.cantidad}</div>
+                      <div class="qty-num-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{l.cantidad}</div>
                       <button 
                         class="qty-btn" 
                         onClick={() => {
