@@ -272,6 +272,8 @@ function ModalCliente({ initialNombre = '', initialApellido = '', initialTelefon
 function PanelDeudasContenido() {
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [busqueda, setBusqueda] = useState('');
+  const [ocultarDeudaCero, setOcultarDeudaCero] = useState(false);
+  const [ordenDeuda, setOrdenDeuda] = useState<'ninguno' | 'asc' | 'desc'>('ninguno');
   const [totalesCliente, setTotalesCliente] = useState<Record<string, number>>({});
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteInfo | null>(null);
   const [observacionesLocales, setObservacionesLocales] = useState('');
@@ -555,13 +557,25 @@ function PanelDeudasContenido() {
 
   // Filtrar clientes
   const term = busqueda.toLowerCase().trim();
-  const clientesFiltrados = term === ''
-    ? clientes
-    : clientes.filter(c =>
+
+  let clientesFiltrados = ocultarDeudaCero
+    ? clientes.filter(c => (totalesCliente[c.id] || 0) > 0)
+    : clientes;
+
+  if (term !== '') {
+    clientesFiltrados = clientesFiltrados.filter(c =>
       c.nombre.toLowerCase().includes(term) ||
       c.apellido.toLowerCase().includes(term) ||
       (c.telefono && c.telefono.includes(term))
     );
+  }
+
+  if (ordenDeuda !== 'ninguno') {
+    clientesFiltrados = [...clientesFiltrados].sort((a, b) => {
+      const diff = (totalesCliente[a.id] || 0) - (totalesCliente[b.id] || 0);
+      return ordenDeuda === 'asc' ? diff : -diff;
+    });
+  }
 
   const deudasVisibles = mostrarPagados
     ? deudas
@@ -648,6 +662,51 @@ function PanelDeudasContenido() {
               }}
             />
           </div>
+
+          <div class="deudas-filtros-chips" style={{
+            display: 'flex',
+            gap: '0.4rem',
+            flexWrap: 'wrap',
+            padding: '0.5rem 0.4rem',
+            borderBottom: '1px solid var(--border)',
+            fontSize: '0.78rem',
+            alignItems: 'center',
+          }}>
+            <span style={{ color: 'var(--text2)', marginRight: '0.2rem', fontWeight: 600 }}>Filtrar:</span>
+            <button
+              onClick={() => setOcultarDeudaCero(v => !v)}
+              style={{
+                background: ocultarDeudaCero ? 'var(--accent)' : 'var(--bg3)',
+                color: ocultarDeudaCero ? '#fff' : 'var(--text)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '20px',
+                padding: '5px 12px',
+                cursor: 'pointer',
+                fontWeight: ocultarDeudaCero ? 700 : 400,
+                fontSize: '0.78rem',
+                transition: 'all 0.15s'
+              }}
+            >
+              {ocultarDeudaCero ? '👁 Sin deuda $0' : '👁 Ocultar $0'}
+            </button>
+            <button
+              onClick={() => setOrdenDeuda(o => o === 'ninguno' ? 'desc' : o === 'desc' ? 'asc' : 'ninguno')}
+              style={{
+                background: ordenDeuda !== 'ninguno' ? 'var(--accent)' : 'var(--bg3)',
+                color: ordenDeuda !== 'ninguno' ? '#fff' : 'var(--text)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '20px',
+                padding: '5px 12px',
+                cursor: 'pointer',
+                fontWeight: ordenDeuda !== 'ninguno' ? 700 : 400,
+                fontSize: '0.78rem',
+                transition: 'all 0.15s'
+              }}
+            >
+              {ordenDeuda === 'ninguno' ? '↕ Deuda' : ordenDeuda === 'desc' ? '↓ Deuda mayor' : '↑ Deuda menor'}
+            </button>
+          </div>
+
           <div class="deudas-client-list">
             {cargandoLista && clientesFiltrados.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text2)' }}>
