@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mapa 3D Interactivo - Arquitectura</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+    </style>
+    <!-- Cargamos la librería 3D Force Graph -->
+    <script src="https://unpkg.com/3d-force-graph"></script>
+</head>
+<body>
+    <div id="3d-graph"></div>
+    <div id="info">Cargando mapa 3D...</div>
+
+    <script>
+        fetch('./architecture.json')
+            .then(res => res.json())
+            .then(data => {
+                // Parseamos el string JSON dentro del resultado
+                const archData = JSON.parse(data.result.content[0].text);
+                const fileTree = archData.file_tree || [];
+                
+                const nodes = [];
+                const links = [];
+                const nodeMap = new Map();
+
+                // Nodo raíz
+                nodes.push({ id: 'root', name: 'Munegon App', val: 5, color: '#ff4b4b' });
+                nodeMap.set('root', true);
+
+                // Crear nodos y enlaces basados en la estructura de archivos
+                fileTree.forEach(item => {
+                    const pathParts = item.path.split('/');
+                    const name = pathParts[pathParts.length - 1];
+                    const id = item.path;
+                    
+                    nodes.push({
+                        id: id,
+                        name: name,
+                        type: item.type,
+                        val: item.type === 'dir' ? 3 : 1,
+                        color: item.type === 'dir' ? '#3d9e6a' : '#4b88ff'
+                    });
+                    nodeMap.set(id, true);
+
+                    // Conectar con su directorio padre
+                    if (pathParts.length > 1) {
+                        const parentPath = pathParts.slice(0, -1).join('/');
+                        links.push({ source: parentPath, target: id });
+                    } else {
+                        // Conectar los de primer nivel a la raíz
+                        links.push({ source: 'root', target: id });
+                    }
+                });
+
+                const graphData = { nodes, links };
+
+                document.getElementById('info').innerHTML = `
+                    <b>Munegon App - Mapa 3D</b><br/>
+                    Nodos (Archivos/Carpetas): ${nodes.length}
+                `;
+
+                // Inicializar el grafo 3D
+                const Graph = ForceGraph3D()
+                    (document.getElementById('3d-graph'))
+                    .graphData(graphData)
+                    .nodeLabel('name')
+                    .nodeAutoColorBy('type')
+                    .linkDirectionalParticles(2)
+                    .linkDirectionalParticleSpeed(d => 0.005)
+                    .onNodeClick(node => {
+                        // Enfocar la cámara en el nodo al hacer clic
+                        const distance = 40;
+                        const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+                        Graph.cameraPosition(
+                            { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+                            node,
+                            3000
+                        );
+                    });
+            })
+            .catch(err => {
+                document.getElementById('info').innerHTML = 'Error al cargar architecture.json. Asegúrate de abrir esto a través de un servidor local o revisa la consola.';
+                console.error(err);
+            });
+    </script>
+</body>
+</html>
