@@ -266,15 +266,15 @@ export async function iniciarSyncListener(): Promise<void> {
 
       await invoke('guardar_datos_pull', {
         payload: {
-          usuarios: pullUsuarios || [],
-          productos: pullProductos || [],
-          cortes: pullCortes || [],
-          ventas: pullVentas || [],
-          lineas: pullLineas || [],
-          clientes: pullClientes || [],
-          deudas: pullDeudas || [],
-          lineas_deuda: pullLineasDeuda || [],
-          configuracion: pullConfig || [],
+          usuarios: pullUsuarios ?? null,
+          productos: pullProductos ?? null,
+          cortes: pullCortes ?? null,
+          ventas: pullVentas ?? null,
+          lineas: pullLineas ?? null,
+          clientes: pullClientes ?? null,
+          deudas: pullDeudas ?? null,
+          lineas_deuda: pullLineasDeuda ?? null,
+          configuracion: pullConfig ?? null,
         },
       });
       console.log(`[Sync] 📥 Pull guardado: ${pullUsuarios?.length} usuarios, ${pullProductos?.length} productos, ${pullVentas?.length} ventas, ${pullClientes?.length} clientes, ${pullDeudas?.length} deudas.`);
@@ -318,11 +318,25 @@ export async function iniciarSyncListener(): Promise<void> {
     console.warn('[Sync] No se pudo registrar el listener (¿ejecutando en navegador web?):', err);
   }
 
+  // ── Estado de sincronización expuesto para que la UI reaccione ──
+  (window as any).__syncEstado = 'pendiente';
+  (window as any).__syncError = null;
+
+  // Escuchar resultado del sync para actualizar el estado global
+  await listen('sync-completado', () => {
+    (window as any).__syncEstado = 'completado';
+    (window as any).__syncError = null;
+  });
+  await listen('sync-fallido', (event: any) => {
+    (window as any).__syncEstado = 'fallido';
+    (window as any).__syncError = event.payload?.error || 'Error desconocido';
+  });
+
   // Desencadenar la sincronización inicial automáticamente
   if (typeof (window as any).forzarSincronizacion === 'function') {
     setTimeout(() => {
       console.log('[Sync] ⏳ Disparando sincronización inicial del sistema...');
       (window as any).forzarSincronizacion();
-    }, 1500); // Pequeño retraso para dejar que la UI termine de montarse y renderizarse
+    }, 500);
   }
 }

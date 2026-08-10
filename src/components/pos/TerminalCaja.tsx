@@ -4,6 +4,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useCallback } from 'preact/hooks';
+import { listen } from '@tauri-apps/api/event';
 import { api } from '../../lib/api';
 import { getSession, destroySession } from '@lib/auth';
 import ModalOverlay from '../ui/ModalOverlay';
@@ -664,10 +665,21 @@ export default function TerminalCaja() {
   const [activeTab, setActiveTab] = useState<'productos' | 'servicios'>('productos');
   const [modalServicio, setModalServicio] = useState<'ninguno' | 'avance' | 'divisas'>('ninguno');
 
+  const [cargandoDatos, setCargandoDatos] = useState(true);
+
   // Carga inicial
   useEffect(() => {
     cargarProductos();
     cargarConfig();
+
+    const unlistenPromise = listen('sync-completado', () => {
+      cargarProductos();
+      cargarConfig();
+    });
+
+    return () => {
+      unlistenPromise.then((fn) => fn());
+    };
   }, []);
 
   const cargarProductos = async () => {
@@ -676,6 +688,8 @@ export default function TerminalCaja() {
       setProductos(data.filter((p) => p.activo));
     } catch (e) {
       console.error('Error cargando productos:', e);
+    } finally {
+      setCargandoDatos(false);
     }
   };
 
@@ -981,7 +995,9 @@ export default function TerminalCaja() {
 
           {activeTab === 'productos' && (
             <div class="productos-grid">
-              {productosFiltrados.length === 0 ? (
+              {cargandoDatos ? (
+                <div class="empty-state">Cargando productos...</div>
+              ) : productosFiltrados.length === 0 ? (
                 <div class="empty-state">
                   {busqueda ? 'Sin resultados' : 'No hay productos disponibles'}
                 </div>

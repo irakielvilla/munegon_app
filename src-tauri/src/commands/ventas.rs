@@ -691,9 +691,9 @@ pub fn verificar_pin(usuario_id: String, pin: String) -> Result<bool, String> {
 
 #[derive(Deserialize)]
 pub struct PullPayload {
-    usuarios: Vec<serde_json::Value>,
-    productos: Vec<serde_json::Value>,
-    cortes: Vec<serde_json::Value>,
+    usuarios: Option<Vec<serde_json::Value>>,
+    productos: Option<Vec<serde_json::Value>>,
+    cortes: Option<Vec<serde_json::Value>>,
     ventas: Option<Vec<serde_json::Value>>,
     lineas: Option<Vec<serde_json::Value>>,
     clientes: Option<Vec<serde_json::Value>>,
@@ -711,8 +711,9 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
     let mut pulled_product_ids = Vec::new();
     let mut pulled_corte_ids = Vec::new();
 
-    // 1. Guardar Usuarios
-    for u in payload.usuarios {
+    // 1. Guardar Usuarios (solo si el pull respondió — Some aunque esté vacío)
+    if let Some(ref usuarios) = payload.usuarios {
+    for u in usuarios {
         let id = u["id"].as_str().unwrap_or("");
         if !id.is_empty() {
             pulled_user_ids.push(id.to_string());
@@ -730,9 +731,11 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
             params![id, nombre, pin, rol, activo],
         ).unwrap_or_default();
     }
+    } // fin if let Some(usuarios)
 
-    // 2. Guardar Productos
-    for p in payload.productos {
+    // 2. Guardar Productos (solo si el pull respondió)
+    if let Some(ref productos) = payload.productos {
+    for p in productos {
         let id = p["id"].as_str().unwrap_or("");
         if !id.is_empty() {
             pulled_product_ids.push(id.to_string());
@@ -756,9 +759,11 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
             params![id, sku, nombre, desc, moneda_base, precio, stock, stock_min, activo],
         ).unwrap_or_default();
     }
+    } // fin if let Some(productos)
 
-    // 3. Guardar Cortes de Caja
-    for c in payload.cortes {
+    // 3. Guardar Cortes de Caja (solo si el pull respondió)
+    if let Some(ref cortes) = payload.cortes {
+    for c in cortes {
         let id = c["id"].as_str().unwrap_or("");
         if !id.is_empty() {
             pulled_corte_ids.push(id.to_string());
@@ -779,8 +784,11 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
             params![id, tipo, usuario_id, total_calculado, total_declarado, diferencia, creado_en],
         ).unwrap_or_default();
     }
+    } // fin if let Some(cortes)
 
     // 4. Limpiar / desactivar usuarios eliminados en Supabase
+    // Solo hacer limpieza si el pull de usuarios respondió (Some); si fue None, la consulta falló → no tocar datos locales
+    if let Some(_) = payload.usuarios {
     if pulled_user_ids.is_empty() {
         tx.execute(
             "DELETE FROM Usuario 
@@ -810,8 +818,11 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
         );
         tx.execute(&deactivate_sql, params_from_iter(params.iter())).unwrap_or_default();
     }
+    } // fin if let Some(usuarios) — limpieza
 
     // 5. Limpiar / desactivar productos eliminados en Supabase
+    // Solo si el pull de productos respondió (Some); None = consulta falló → no tocar
+    if let Some(_) = payload.productos {
     if pulled_product_ids.is_empty() {
         tx.execute(
             "DELETE FROM Producto 
@@ -837,8 +848,11 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
         );
         tx.execute(&deactivate_sql, params_from_iter(params.iter())).unwrap_or_default();
     }
+    } // fin if let Some(productos) — limpieza
 
     // 6. Limpiar cortes eliminados en Supabase
+    // Solo si el pull de cortes respondió (Some); None = consulta falló → no tocar
+    if let Some(_) = payload.cortes {
     if pulled_corte_ids.is_empty() {
         tx.execute(
             "DELETE FROM CorteCaja 
@@ -856,6 +870,7 @@ pub fn guardar_datos_pull(payload: PullPayload) -> Result<(), String> {
         let params: Vec<&str> = pulled_corte_ids.iter().map(|s| s.as_str()).collect();
         tx.execute(&delete_sql, params_from_iter(params.iter())).unwrap_or_default();
     }
+    } // fin if let Some(cortes) — limpieza
 
     // 7. Guardar Ventas
     if let Some(ventas) = payload.ventas {

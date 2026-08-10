@@ -474,6 +474,51 @@
   .sync-indicator {
     font-size: 0.8125rem;
   }
+
+  /* ── Pantalla de espera / sincronización ──────────────── */
+  .sync-waiting {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-muted);
+  }
+  .sync-waiting p {
+    font-size: 1rem;
+    margin: 0 0 4px;
+  }
+  .sync-waiting-sub {
+    font-size: 0.8rem;
+    opacity: 0.7;
+  }
+  .sync-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--bg3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: sync-spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes sync-spin {
+    to { transform: rotate(360deg); }
+  }
+  .btn-reintentar {
+    margin-top: 12px;
+    padding: 8px 24px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-reintentar:hover {
+    background: var(--accent-hover, #2563eb);
+  }
+  .btn-reintentar:active {
+    transform: scale(0.97);
+  }
 </style>
 
 <!-- ══════════════════════════════════════════════════════════
@@ -510,16 +555,42 @@
     }
 
     renderizarUsuarios(usuarios);
+    return usuarios.length > 0;
   }
 
   function renderizarUsuarios(usuarios: Usuario[]) {
     viewUsers.innerHTML = "";
 
     if (usuarios.length === 0) {
-      viewUsers.innerHTML = `
-      <p style="text-align:center;color:var(--text-muted);padding:24px 0;">
-        No hay usuarios registrados.
-      </p>`;
+      const syncEstado = (window as any).__syncEstado;
+      const syncError = (window as any).__syncError;
+
+      if (syncEstado === 'pendiente') {
+        viewUsers.innerHTML = `
+        <div class="sync-waiting">
+          <div class="sync-spinner"></div>
+          <p>Verificando datos...</p>
+          <p class="sync-waiting-sub">Esto solo ocurre la primera vez que se inicia la app</p>
+        </div>`;
+      } else if (syncEstado === 'fallido') {
+        const msg = syncError?.includes('offline') || syncError?.includes('internet') || syncError?.includes('No hay conexión')
+          ? 'Se necesita conexión a internet para la primera configuración'
+          : 'No se pudo conectar con el servidor';
+        viewUsers.innerHTML = `
+        <div class="sync-waiting">
+          <p style="margin-bottom:8px;">${msg}</p>
+          <p class="sync-waiting-sub">Verifica tu conexión y reintenta</p>
+          <button class="btn-reintentar" id="btn-reintentar-sync">Reintentar</button>
+        </div>`;
+        setTimeout(() => {
+          document.getElementById('btn-reintentar-sync')?.addEventListener('click', reintentarSync);
+        }, 0);
+      } else {
+        viewUsers.innerHTML = `
+        <p style="text-align:center;color:var(--text-muted);padding:24px 0;">
+          No hay usuarios registrados.
+        </p>`;
+      }
       return;
     }
 
@@ -555,6 +626,34 @@
       });
 
       viewUsers.appendChild(card);
+    });
+  }
+
+  // ── Reintentar sincronización ───────────────────────────────
+  function reintentarSync() {
+    const btn = document.getElementById('btn-reintentar-sync');
+    if (btn) btn.textContent = 'Reintentando...';
+    (window as any).__syncEstado = 'pendiente';
+
+    if (typeof (window as any).forzarSincronizacion === 'function') {
+      (window as any).forzarSincronizacion();
+    }
+
+    setTimeout(() => {
+      cargarUsuarios();
+    }, 4000);
+  }
+
+  // ── Escuchar eventos de sincronización ──────────────────────
+  async function iniciarEsperaSync() {
+    const { listen: tauriListen } = await import('@tauri-apps/api/event');
+
+    await tauriListen('sync-completado', () => {
+      cargarUsuarios();
+    });
+
+    await tauriListen('sync-fallido', () => {
+      cargarUsuarios();
     });
   }
 
@@ -722,5 +821,9 @@
   actualizarEstadoConexion();
 
   // ── Inicializar ─────────────────────────────────────────────
-  cargarUsuarios();
+  cargarUsuarios().then((tieneUsuarios) => {
+    if (!tieneUsuarios) {
+      iniciarEsperaSync();
+    }
+  });
 </script>
