@@ -17,10 +17,11 @@ pub struct SupabaseConfig {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Cargar .env en modo desarrollo (debug) para que std::env::var funcione
+    // En desarrollo, cargar .env.development (NUNCA se commitea).
+    // Si no existe, las credenciales serán strings vacíos y la app funciona offline.
     #[cfg(debug_assertions)]
     {
-        let _ = dotenvy::dotenv();
+        let _ = dotenvy::from_filename(".env.development").ok();
     }
 
     // Leer credenciales de Supabase:
